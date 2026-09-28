@@ -53,7 +53,7 @@ await page.reload();if(await page.evaluate(()=>JSON.parse(localStorage.getItem('
 await page.getByRole('button',{name:'Начать играть',exact:true}).click();
 await page.getByRole('button',{name:'Включить камеру',exact:true}).click();
 await page.getByText('ИЩЕМ РУКУ',{exact:true}).waitFor({timeout:60000});
-await page.getByText('Покажи руку целиком перед камерой. Добавь света, если темно.').waitFor();
+await page.locator('.coach-feedback').getByText('Покажи руку',{exact:true}).waitFor();
 await page.screenshot({path:'artifacts/camera.png'});
 const aligned=await page.evaluate(()=>{const v=document.querySelector('video').getBoundingClientRect();const a=document.querySelector('.ar-overlay').getBoundingClientRect();const c=document.querySelector('canvas').getBoundingClientRect();return Math.abs(v.width-a.width)<1&&Math.abs(v.height-a.height)<1&&v.x===a.x&&v.y===a.y&&c.x===a.x&&c.y===a.y;});
 if(!aligned)throw Error('AR/video coordinate alignment failed');
@@ -94,7 +94,17 @@ await motion.getByText('ИЩЕМ РУКУ',{exact:true}).waitFor();
 async function move(x,y,pinch=false){await motion.evaluate(({x,y,pinch})=>{const points=Array.from({length:21},()=>({x:1-x,y,z:0}));points[0].y=y+.12;points[4]={x:1-(x-.025),y:y-.04,z:0};points[8]={x:1-(x+(pinch?-.01:.095)),y:y-(pinch?.04:.10),z:0};window.__landmarks=points;},{x,y,pinch});await motion.waitForTimeout(110);}
 await move(.65,.43);
 await motion.getByText('СЛЕДУЮЩИЙ ПРИЁМ',{exact:true}).waitFor();
-for(const y of [.46,.50,.54,.59,.65,.71])await move(.65,y);
+await move(.24,.43);
+await motion.locator('.coach-feedback').getByText('Рука слишком слева',{exact:true}).waitFor();
+await motion.locator('.ar-coach-target').waitFor();
+await motion.screenshot({path:'artifacts/clear-motion-correction.png'});
+await motion.evaluate(()=>{window.__landmarks=null;});
+await motion.getByText('ПАУЗА · ВЕРНИ РУКУ',{exact:true}).waitFor();
+const pausedStats=await motion.locator('.session-stats').innerText();
+await motion.waitForTimeout(1200);
+if(await motion.locator('.session-stats').innerText()!==pausedStats)throw Error('tracking-loss timer was not paused');
+await move(.65,.49);
+await move(.65,.71);
 await motion.locator('.gesture-control.expected').filter({hasText:'Бой вверх'}).waitFor();
 if(!(await motion.locator('.session-stats').innerText()).includes('100'))throw Error('live motion did not score');
 await motion.screenshot({path:'artifacts/ar-dombyra-live.png'});
@@ -112,10 +122,11 @@ await motion.evaluate(()=>{window.__landmarks=null;});await motion.waitForTimeou
 await move(.65,.43);
 await motion.getByText('Совмести точку на кисти с меткой',{exact:true}).waitFor();
 await motion.getByText('СЛЕДУЮЩИЙ ПРИЁМ',{exact:true}).waitFor();
+// A burst of repeated strikes must be heard exactly once per impact, before score aggregation.
 await motion.reload();await motion.getByRole('button',{name:'Попробовать демо без камеры'}).click();
 await motion.getByRole('button',{name:'Показать AR-инструмент'}).waitFor();
 await motion.close();
-console.log(JSON.stringify({passed:['desktop render','filters','QR','demo final and scoring','persistence','timeout and replay','permission denied and demo fallback','QR deep link','MediaPipe camera initialization','mobile width','mobile navigation','all instrument scenarios','AR toggle and persistence','AR/video alignment','hands-free start and real motion event integration','hidden AR keeps recognizing','hands-free 9-note result and replay'],errors}));
+console.log(JSON.stringify({passed:['desktop render','filters','QR','demo final and scoring','persistence','timeout and replay','permission denied and demo fallback','QR deep link','MediaPipe camera initialization','mobile width','mobile navigation','all instrument scenarios','AR toggle and persistence','AR/video alignment','hands-free start and real motion event integration','hidden AR keeps recognizing','hands-free 9-note result and replay','directional error and AR arrow','timer pauses on tracking loss'],errors}));
 if(errors.length)process.exitCode=1;
 } finally {
   await browser?.close();

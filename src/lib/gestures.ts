@@ -131,7 +131,7 @@ export class MotionRecognizer {
       else if(distance(p,this.previous)<.065){this.setTip(r,coach('jitter','Изображение дёрнулось','Продолжай движение. Этот скачок не засчитан.'));}
       else{this.resetPath();}
     }
-    if(this.previous&&distance(p,this.previous)>.17&&now-this.previous.time<160){
+    if(this.previous&&distance(p,this.previous)>.28&&now-this.previous.time<160){
       this.pendingJump=p;r.recovering=true;r.trace=this.history;
       return r;
     }
@@ -165,7 +165,7 @@ export class MotionRecognizer {
         if(p.time-this.pinch.time>=12&&Math.abs(p.y-.6)<.14&&p.time-this.lastEvent>75)this.emit(r,{gesture:'pluck',strength:.65},p.time);
         this.pinch=null;
       }
-      if(prev&&!this.pinch&&!r.events.length&&p.time-this.lastEvent>=45){
+      if(prev&&!this.pinch&&!r.events.length&&p.time-this.lastEvent>=25){
         const direction=p.y>prev.y?1:-1;const start=direction>0?this.above:this.below;
         if(start&&p.time-start.time<1600&&direction*(p.y-.6)>=margin&&direction*(p.y-start.y)>=amplitude&&Math.abs(p.x-start.x)<Math.abs(p.y-start.y)*1.9){
           const t=(.6-start.y)/(p.y-start.y);const crossingX=start.x+(p.x-start.x)*t;
@@ -229,7 +229,7 @@ export class MotionRecognizer {
           const gesture:Gesture=Math.abs(x-.5)<=.115?'drum-center':'drum-rim';
           const impactTime=start.time+(p.time-start.time)*t;
           r.impacts.push({gesture,strength});
-          if(this.drumPending&&impactTime-this.drumPending.time<=500&&impactTime-this.drumPending.time>=65){this.emit(r,{gesture:'drum-double',strength},p.time);this.drumPending=null;}
+          if(this.drumPending&&impactTime-this.drumPending.time<=500&&impactTime-this.drumPending.time>=25){this.emit(r,{gesture:'drum-double',strength},p.time);this.drumPending=null;}
           else this.drumPending={gesture,time:impactTime,strength};
           this.above=null;
         }
