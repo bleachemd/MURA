@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowDown, ArrowRight, AudioLines, BadgeCheck, Camera, Check, CheckCheck, ChevronRight, CircleHelp, Copy, Download, ExternalLink, Globe2, Hand, Headphones, Landmark, Menu, Music2, Play, QrCode, ScanLine, ShieldCheck, Sparkles, Trophy, Volume2, VolumeX, X } from 'lucide-react';
+import { ArrowRight, AudioLines, BadgeCheck, Camera, CheckCheck, ChevronRight, CircleHelp, Copy, Download, ExternalLink, Globe2, Hand, Landmark, Menu, Music2, Play, QrCode, ScanLine, ShieldCheck, Sparkles, Trophy, Volume2, VolumeX, X } from 'lucide-react';
 import QRCode from 'qrcode';
 import { InstrumentArt } from './components/InstrumentArt';
 import { Session, type Instrument } from './components/Session';
