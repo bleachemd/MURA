@@ -1,12 +1,25 @@
 import { existsSync, mkdirSync } from 'node:fs';
 import { chromium } from '@playwright/test';
+import { spawn } from 'node:child_process';
+const baseURL='http://localhost:4175';
+const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','localhost','--port','4175','--strictPort'],{stdio:'pipe'});
+let serverError='';
+server.stderr.on('data',data=>{serverError+=data;});
+let browser;
+try {
+  for(let attempt=0;attempt<60;attempt++){
+    if(server.exitCode!==null) throw Error(`Test server failed: ${serverError}`);
+    try{if((await fetch(baseURL)).ok)break;}catch{}
+    await new Promise(resolve=>setTimeout(resolve,200));
+    if(attempt===59)throw Error('Test server did not start');
+  }
 mkdirSync('artifacts', { recursive: true });
 const localChrome='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const executablePath=process.env.CHROME_PATH || (existsSync(localChrome)?localChrome:undefined);
-const browser = await chromium.launch({executablePath,headless:true,args:['--use-fake-ui-for-media-stream','--use-fake-device-for-media-stream']});
+browser = await chromium.launch({executablePath,headless:true,args:['--use-fake-ui-for-media-stream','--use-fake-device-for-media-stream']});
 const page = await browser.newPage({viewport:{width:1440,height:1120},reducedMotion:'reduce'});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
-await page.goto('http://localhost:5173');await page.evaluate(()=>document.fonts.ready);
+await page.goto(baseURL);await page.evaluate(()=>document.fonts.ready);
 await page.screenshot({path:'artifacts/desktop.png',fullPage:true});
 await page.getByRole('button',{name:'Ударные',exact:true}).click();
 if(await page.locator('.instrument-card').count()!==1)throw Error('filter failed');
@@ -22,9 +35,16 @@ for(const name of ['Открытая ладонь','Два пальца','Кул
 await page.getByText('ДЕМО ЗАВЕРШЕНО',{exact:true}).waitFor();
 if(!(await page.locator('.result-score').innerText()).includes('875'))throw Error('scoring failed');
 await page.screenshot({path:'artifacts/result.png'});
+await page.getByRole('button',{name:'Сыграть ещё'}).click();
+await page.clock.install();
+await page.getByRole('button',{name:'Начать выступление',exact:true}).click();
+await page.clock.fastForward(46000);
+await page.getByText('Музыка начинается с практики',{exact:true}).waitFor();
+if(!(await page.locator('.result-score').innerText()).startsWith('0'))throw Error('timeout score failed');
+await page.clock.resume();
 await page.keyboard.press('Escape');await page.getByRole('button',{name:'Мои достижения',exact:true}).click();
-if(await page.locator('.history-row').count()!==1)throw Error('history failed');
-await page.reload();if(await page.evaluate(()=>JSON.parse(localStorage.getItem('mura-performances-v1')).length)!==1)throw Error('persistence failed');
+if(await page.locator('.history-row').count()!==2)throw Error('history failed');
+await page.reload();if(await page.evaluate(()=>JSON.parse(localStorage.getItem('mura-performances-v1')).length)!==2)throw Error('persistence failed');
 await page.getByRole('button',{name:'Начать играть',exact:true}).click();
 await page.getByRole('button',{name:'Включить камеру',exact:true}).click();
 await page.getByText('ИЩЕМ РУКУ',{exact:true}).waitFor({timeout:60000});
@@ -38,6 +58,18 @@ const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>wind
 await page.getByRole('button',{name:'Открыть меню'}).click();await page.getByRole('button',{name:'Как это работает',exact:true}).click();
 await page.getByRole('heading',{name:'Пусть руки говорят.'}).waitFor();
 await page.screenshot({path:'artifacts/mobile-guide.png',fullPage:true});
-console.log(JSON.stringify({passed:['desktop render','filters','QR','demo final and scoring','persistence','MediaPipe camera initialization','mobile width','mobile navigation'],errors}));
-await browser.close();
+const denied=await browser.newPage();
+await denied.addInitScript(()=>{navigator.mediaDevices.getUserMedia=async()=>{throw new DOMException('Denied','NotAllowedError');};});
+await denied.goto(`${baseURL}/?instrument=kobyz`);
+await denied.getByRole('heading',{name:'Кобыз / Қобыз'}).waitFor();
+await denied.getByRole('button',{name:'Включить камеру',exact:true}).click();
+await denied.getByText('Доступ к камере закрыт.',{exact:false}).waitFor();
+await denied.getByRole('button',{name:'Открыть демо',exact:true}).click();
+await denied.getByRole('button',{name:'Начать выступление',exact:true}).waitFor();
+await denied.close();
+console.log(JSON.stringify({passed:['desktop render','filters','QR','demo final and scoring','persistence','timeout and replay','permission denied and demo fallback','QR deep link','MediaPipe camera initialization','mobile width','mobile navigation'],errors}));
 if(errors.length)process.exitCode=1;
+} finally {
+  await browser?.close();
+  server.kill();
+}
