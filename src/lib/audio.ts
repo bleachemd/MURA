@@ -1,36 +1,46 @@
 import type { Gesture } from './gestures';
 let context: AudioContext | undefined;
 let enabled = true;
-export function setSound(value: boolean) { enabled = value; }
-export async function unlockAudio() {
-  context ??= new AudioContext();
-  if (context.state === 'suspended') await context.resume();
+let bow: { gain: GainNode; oscillator: OscillatorNode; filter: BiquadFilterNode } | undefined;
+export function setSound(value: boolean) { enabled=value;if(!value)stopBow(); }
+export async function unlockAudio() { context ??= new AudioContext();if(context.state==='suspended')await context.resume(); }
+export function stopBow() {
+  if(!bow || !context)return;
+  const old=bow;bow=undefined;old.gain.gain.cancelScheduledValues(context.currentTime);old.gain.gain.setTargetAtTime(.0001,context.currentTime,.035);old.oscillator.stop(context.currentTime+.2);
+  old.oscillator.onended=()=>{old.oscillator.disconnect();old.filter.disconnect();old.gain.disconnect();};
 }
-export function playNote(gesture: Gesture, instrument = 'dombyra') {
-  if (!enabled || !context || context.state !== 'running') return;
-  const ctx = context;
-  const now = ctx.currentTime;
-  const percussion = gesture === 'fist' || instrument === 'dauylpaz';
-  const freq = percussion ? (gesture === 'peace' ? 180 : gesture === 'palm' ? 110 : 70) : gesture === 'palm' ? 293.66 : 440;
-  const duration = instrument === 'kobyz' && !percussion ? 1.3 : .85;
-  const gain = ctx.createGain();
-  gain.gain.setValueAtTime(.001, now);
-  gain.gain.exponentialRampToValueAtTime(.19, now + .018);
-  gain.gain.exponentialRampToValueAtTime(.001, now + duration);
-  gain.connect(ctx.destination);
-  if (percussion) {
-    const osc = ctx.createOscillator(); osc.frequency.setValueAtTime(freq, now); osc.frequency.exponentialRampToValueAtTime(40, now + .32); osc.connect(gain); osc.start(now); osc.stop(now + duration);
-  } else if (instrument === 'kobyz') {
-    const osc = ctx.createOscillator(); osc.type = 'sawtooth'; osc.frequency.value = freq / 2;
-    const filter = ctx.createBiquadFilter(); filter.type = 'lowpass'; filter.frequency.value = 1300;
-    osc.connect(filter); filter.connect(gain); osc.start(now); osc.stop(now + duration);
-  } else {
-    // Karplus–Strong: a decaying delay line gives the virtual strings a plucked timbre.
-    const length = Math.round(ctx.sampleRate / freq);
-    const buffer = ctx.createBuffer(1, ctx.sampleRate * duration, ctx.sampleRate);
-    const data = buffer.getChannelData(0); const ring = new Float32Array(length);
-    for (let i = 0; i < length; i++) ring[i] = Math.random() * 2 - 1;
-    for (let i = 0; i < data.length; i++) { const j = i % length; data[i] = ring[j]; ring[j] = .496 * (ring[j] + ring[(j + 1) % length]); }
-    const source = ctx.createBufferSource(); source.buffer = buffer; source.connect(gain); source.start(now);
+/** The sustained kobyz tone follows actual bow movement, stopping when the hand stops. */
+export function updateBow(speed: number) {
+  if(!context || context.state!=='running' || !enabled || speed<.07){stopBow();return;}
+  const ctx=context;
+  if(!bow) {
+    const oscillator=ctx.createOscillator();oscillator.type='sawtooth';oscillator.frequency.value=146.83;
+    const filter=ctx.createBiquadFilter();filter.type='lowpass';
+    const gain=ctx.createGain();gain.gain.value=.0001;
+    oscillator.connect(filter);filter.connect(gain);gain.connect(ctx.destination);oscillator.start();bow={oscillator,filter,gain};
   }
+  bow.filter.frequency.setTargetAtTime(700+Math.min(speed,1.4)*700,ctx.currentTime,.07);
+  bow.gain.gain.setTargetAtTime(.025+Math.min(speed,1.4)*.05,ctx.currentTime,.035);
+}
+export function playNote(gesture: Gesture, instrument = 'dombyra', strength=.7) {
+  if(!enabled || !context || context.state!=='running')return;
+  const ctx=context;const now=ctx.currentTime;const volume=.12+Math.min(1,Math.max(0,strength))*.14;
+  function pluck(frequency: number,delay: number,level: number) {
+    const duration=.95;const length=Math.round(ctx.sampleRate/frequency);const buffer=ctx.createBuffer(1,ctx.sampleRate*duration,ctx.sampleRate);const data=buffer.getChannelData(0);const ring=new Float32Array(length);
+    for(let i=0;i<length;i++)ring[i]=Math.random()*2-1;
+    for(let i=0;i<data.length;i++){const j=i%length;data[i]=ring[j];ring[j]=.496*(ring[j]+ring[(j+1)%length]);}
+    const source=ctx.createBufferSource();source.buffer=buffer;const gain=ctx.createGain();gain.gain.value=volume*level;source.connect(gain);gain.connect(ctx.destination);source.start(now+delay);source.onended=()=>{source.disconnect();gain.disconnect();};
+  }
+  function drum(frequency: number,delay: number) {
+    const at=now+delay;const osc=ctx.createOscillator();osc.frequency.setValueAtTime(frequency,at);osc.frequency.exponentialRampToValueAtTime(frequency*.38,at+.3);
+    const gain=ctx.createGain();gain.gain.setValueAtTime(.001,at);gain.gain.exponentialRampToValueAtTime(volume,at+.008);gain.gain.exponentialRampToValueAtTime(.001,at+.65);osc.connect(gain);gain.connect(ctx.destination);osc.start(at);osc.stop(at+.7);osc.onended=()=>{osc.disconnect();gain.disconnect();};
+  }
+  if(instrument==='dauylpaz'){drum(gesture==='drum-rim'?190:95,0);if(gesture==='drum-double')drum(95,.14);}
+  else if(instrument==='kobyz') {
+    const duration=gesture==='bow-short'?.23:.85;const osc=ctx.createOscillator();osc.type='sawtooth';osc.frequency.value=146.83;
+    const filter=ctx.createBiquadFilter();filter.frequency.value=gesture==='bow-left'?1050:1250;
+    const gain=ctx.createGain();gain.gain.setValueAtTime(.001,now);gain.gain.exponentialRampToValueAtTime(volume*.4,now+.05);gain.gain.exponentialRampToValueAtTime(.001,now+duration);
+    osc.connect(filter);filter.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(now+duration);osc.onended=()=>{osc.disconnect();filter.disconnect();gain.disconnect();};
+  } else if(gesture==='pluck')pluck(293.66,0,1);
+  else {const notes=gesture==='strum-up'?[220,146.83]:[146.83,220];pluck(notes[0],0,.8);pluck(notes[1],.022,.8);}
 }
