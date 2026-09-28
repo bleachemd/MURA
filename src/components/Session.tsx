@@ -73,8 +73,9 @@ export function Session({ instrument, close, onComplete }: { instrument: Instrum
       for(const [a,b]of connections){if(!points[a]||!points[b])continue;ctx.beginPath();ctx.moveTo(points[a].x*c.width,points[a].y*c.height);ctx.lineTo(points[b].x*c.width,points[b].y*c.height);ctx.stroke();}
       for(const p of points){if(!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;ctx.beginPath();ctx.arc(p.x*c.width,p.y*c.height,3,0,Math.PI*2);ctx.fill();}
     };
-    const loop=(now:number)=>{
+    const loop=()=>{
       if(cancelled)return;
+      const now=performance.now();
       const v=video.current;
       if(v&&model&&v.readyState>=2&&v.currentTime!==previousFrame&&now-lastTime>=28){
         previousFrame=v.currentTime;lastTime=now;
@@ -98,7 +99,7 @@ export function Session({ instrument, close, onComplete }: { instrument: Instrum
             draw(points,result.inZone&&!quality);
             if(instrument.id==='kobyz')updateBow(result.bowSpeed);
             // Drum audio follows each physical impact immediately; score waits for the double-hit window.
-            for(const hit of result.impacts)playNote(hit.gesture,instrument.id,hit.strength);
+            for(const hit of result.impacts){playNote(hit.gesture,instrument.id,hit.strength);setRecognized(hit.gesture);clearTimeout(noteTimeout.current);noteTimeout.current=setTimeout(()=>setRecognized(null),220);}
             for(const event of result.events)action.current(event.gesture,event.strength);
             if(!result.events.length&&paint)publish.current(result.coach,now);
           }else{
@@ -137,13 +138,13 @@ export function Session({ instrument, close, onComplete }: { instrument: Instrum
         try{model=await HandLandmarker.createFromOptions(vision,{...options,baseOptions:{modelAssetPath:'/models/hand_landmarker.task',delegate:'GPU'}});}
         catch{if(cancelled)return;model=await HandLandmarker.createFromOptions(vision,{...options,baseOptions:{modelAssetPath:'/models/hand_landmarker.task',delegate:'CPU'}});}
         if(cancelled){model.close();return;}
-        setLoading(false);reset();schedule();
+        setLoading(false);reset();rateStart=performance.now();processed=0;schedule();
       }catch(e){
         stream?.getTracks().forEach(t=>t.stop());if(cancelled)return;setLoading(false);const name=(e as Error).name;
         setError((e as Error).message==='secure'?'Для камеры нужна защищённая ссылка HTTPS или localhost. Открой сайт по HTTPS.':name==='NotAllowedError'?'Доступ к камере закрыт. Разреши камеру в настройках сайта рядом с адресной строкой и попробуй снова.':name==='NotFoundError'?'Камера не найдена. Подключи веб-камеру или открой ссылку на телефоне.':name==='NotReadableError'?'Камера занята другим приложением. Закрой его и попробуй снова.':'Не удалось запустить распознавание. Проверь соединение и доступ к камере, затем попробуй снова.');
       }
     }
-    const onVisibility=()=>{if(document.hidden){stopBow();detector.current.reset();}};
+    const onVisibility=()=>{if(document.hidden){stopBow();detector.current.reset();if(state.current.phase==='playing'&&!pause.current.since){pause.current.since=Date.now();setTrackingPaused(true);}}};
     document.addEventListener('visibilitychange',onVisibility);void init();
     return()=>{cancelled=true;if(videoCallback)video.current?.cancelVideoFrameCallback(frame);else cancelAnimationFrame(frame);stream?.getTracks().forEach(t=>t.stop());model?.close();stopBow();document.removeEventListener('visibilitychange',onVisibility);};
   },[mode,instrument.id]);
