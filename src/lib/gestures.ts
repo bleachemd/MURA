@@ -139,7 +139,7 @@ export class MotionRecognizer {
       if(p.y>.65) this.below=p;
     }
     this.previous=p;
-    if(result.event) {this.lastEvent=now;this.above=null;this.below=null;result.hint=`${this.profile.gestures.find(g=>g.id===result.event!.gesture)?.name}. Движение распознано!`;}
+    if(result.event) {this.lastEvent=now;if(this.profile.id==='dombyra'){this.above=p.y<.55?p:null;this.below=p.y>.65?p:null;}result.hint=`${this.profile.gestures.find(g=>g.id===result.event!.gesture)?.name}. Движение распознано!`;}
     return result;
   }
 }

@@ -29,9 +29,14 @@ if(!(await page.locator('.qr-url').inputValue()).includes('instrument=kobyz'))th
 await page.keyboard.press('Escape');
 await page.getByRole('button',{name:'Начать играть',exact:true}).click();
 await page.getByRole('button',{name:'Попробовать демо без камеры'}).click();
+await page.locator('[data-testid="ar-instrument"]').waitFor();
+await page.getByRole('button',{name:'Скрыть AR-инструмент',exact:true}).click();
+if(await page.locator('[data-testid="ar-instrument"]').count())throw Error('AR hide failed');
+await page.getByRole('button',{name:'Показать AR-инструмент',exact:true}).click();
+await page.locator('[data-testid="ar-instrument"]').waitFor();
 await page.getByRole('button',{name:'Начать выступление',exact:true}).click();
-await page.locator('.gesture-control').filter({hasText:'Два пальца'}).click();
-for(const name of ['Открытая ладонь','Два пальца','Кулак','Открытая ладонь','Кулак','Два пальца','Открытая ладонь','Два пальца','Кулак'])await page.locator('.gesture-control').filter({hasText:name}).click();
+await page.locator('.gesture-control').filter({hasText:'Бой вверх'}).click();
+for(const name of ['Бой вниз','Бой вверх','Щипок струны','Бой вниз','Щипок струны','Бой вверх','Бой вниз','Бой вверх','Щипок струны'])await page.locator('.gesture-control').filter({hasText:name}).click();
 await page.getByText('ДЕМО ЗАВЕРШЕНО',{exact:true}).waitFor();
 if(!(await page.locator('.result-score').innerText()).includes('875'))throw Error('scoring failed');
 await page.screenshot({path:'artifacts/result.png'});
@@ -50,6 +55,8 @@ await page.getByRole('button',{name:'Включить камеру',exact:true})
 await page.getByText('ИЩЕМ РУКУ',{exact:true}).waitFor({timeout:60000});
 await page.getByText('Покажи руку целиком перед камерой. Добавь света, если темно.').waitFor();
 await page.screenshot({path:'artifacts/camera.png'});
+const aligned=await page.evaluate(()=>{const v=document.querySelector('video').getBoundingClientRect();const a=document.querySelector('.ar-overlay').getBoundingClientRect();const c=document.querySelector('canvas').getBoundingClientRect();return Math.abs(v.width-a.width)<1&&Math.abs(v.height-a.height)<1&&v.x===a.x&&v.y===a.y&&c.x===a.x&&c.y===a.y;});
+if(!aligned)throw Error('AR/video coordinate alignment failed');
 await page.keyboard.press('Escape');
 await page.setViewportSize({width:390,height:844});
 await page.getByRole('heading',{name:'Музыка в твоих руках.'}).click();
@@ -67,7 +74,38 @@ await denied.getByText('Доступ к камере закрыт.',{exact:false
 await denied.getByRole('button',{name:'Открыть демо',exact:true}).click();
 await denied.getByRole('button',{name:'Начать выступление',exact:true}).waitFor();
 await denied.close();
-console.log(JSON.stringify({passed:['desktop render','filters','QR','demo final and scoring','persistence','timeout and replay','permission denied and demo fallback','QR deep link','MediaPipe camera initialization','mobile width','mobile navigation'],errors}));
+for(const [id,names] of [['kobyz',['Смычок вправо','Смычок влево','Короткий штрих']],['dauylpaz',['Удар в центр','Удар по краю','Двойной удар']]]){
+  const demo=await browser.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});
+  await demo.goto(`${baseURL}/?instrument=${id}`);
+  await demo.getByRole('button',{name:'Попробовать демо без камеры'}).click();
+  await demo.getByRole('button',{name:'Начать выступление',exact:true}).click();
+  await demo.screenshot({path:`artifacts/ar-${id}-mobile.png`});
+  for(const i of [0,1,2,0,2,1,0,1,2])await demo.locator('.gesture-control').filter({hasText:names[i]}).click();
+  await demo.getByText('ДЕМО ЗАВЕРШЕНО',{exact:true}).waitFor();
+  if(!(await demo.locator('.result-score').innerText()).startsWith('900'))throw Error(`${id} score failed`);
+  await demo.close();
+}
+// Synthetic landmark integration: the real camera/model initialization is verified separately above.
+const motion=await browser.newPage({viewport:{width:1100,height:950},reducedMotion:'reduce'});
+await motion.route(/@mediapipe_tasks-vision\.js/,route=>route.fulfill({contentType:'text/javascript',body:`export const FilesetResolver={forVisionTasks:async()=>({})};export const HandLandmarker={createFromOptions:async()=>({detectForVideo:()=>({landmarks:window.__landmarks?[window.__landmarks]:[]}),close:()=>{}})};`}));
+await motion.goto(`${baseURL}/?instrument=dombyra`);
+await motion.getByRole('button',{name:'Включить камеру',exact:true}).click();
+await motion.getByText('ИЩЕМ РУКУ',{exact:true}).waitFor();
+async function move(x,y){await motion.evaluate(({x,y})=>{const points=Array.from({length:21},()=>({x:1-x,y,z:0}));points[0].y=y+.12;points[4]={x:1-(x-.025),y:y-.04,z:0};points[8]={x:1-(x+.095),y:y-.10,z:0};window.__landmarks=points;},{x,y});await motion.waitForTimeout(110);}
+await move(.65,.43);
+await motion.getByText('СЛЕДУЮЩИЙ ПРИЁМ',{exact:true}).waitFor();
+for(const y of [.46,.50,.54,.59,.65,.71])await move(.65,y);
+await motion.locator('.gesture-control.expected').filter({hasText:'Бой вверх'}).waitFor();
+if(!(await motion.locator('.session-stats').innerText()).includes('100'))throw Error('live motion did not score');
+await motion.screenshot({path:'artifacts/ar-dombyra-live.png'});
+await motion.getByRole('button',{name:'Скрыть AR-инструмент'}).click();
+for(const y of [.71,.67,.62,.56,.50])await move(.65,y);
+await motion.locator('.gesture-control.expected').filter({hasText:'Щипок струны'}).waitFor();
+if(!(await motion.locator('.session-stats').innerText()).includes('200'))throw Error('motion with hidden AR did not score');
+await motion.reload();await motion.getByRole('button',{name:'Попробовать демо без камеры'}).click();
+await motion.getByRole('button',{name:'Показать AR-инструмент'}).waitFor();
+await motion.close();
+console.log(JSON.stringify({passed:['desktop render','filters','QR','demo final and scoring','persistence','timeout and replay','permission denied and demo fallback','QR deep link','MediaPipe camera initialization','mobile width','mobile navigation','all instrument scenarios','AR toggle and persistence','AR/video alignment','hands-free start and real motion event integration','hidden AR keeps recognizing'],errors}));
 if(errors.length)process.exitCode=1;
 } finally {
   await browser?.close();
