@@ -207,11 +207,11 @@ export class MotionRecognizer {
         b.minY=Math.min(b.minY,p.y);b.maxY=Math.max(b.maxY,p.y);
         if(b.direction*(p.x-b.end.x)>noise*.6){b.end=p;b.lastMove=p.time;}
         const travel=Math.abs(b.end.x-b.from.x);const drift=b.maxY-b.minY;
-        if(drift>.10||Math.abs(p.y-b.from.y)>.055&&Math.abs(p.y-b.from.y)>travel*1.25){
+        if(drift>.10||Math.abs(p.y-b.from.y)>.035&&Math.abs(p.y-b.from.y)>travel*1.25){
           this.bow=null;r.bowSpeed=0;this.setTip(r,coach('bow-height','Смычок ушёл по диагонали','Держи руку на одной высоте. Веди её вбок по светлой дорожке.',{x:p.x,y:.56},'warning'));
         }else{
           if(!b.emitted&&travel>=long){this.emit(r,{gesture:b.direction>0?'bow-right':'bow-left',strength},p.time);b.emitted=true;}
-          const moving=p.time-b.lastMove<110;r.bowSpeed=moving?Math.max(.09,Math.abs(dx)/dt):0;
+          const moving=b.direction!==0&&travel>noise*2&&p.time-b.lastMove<110;r.bowSpeed=moving?Math.max(.09,Math.abs(dx)/dt):0;
           if(p.time-b.lastMove>140){
             if(!b.emitted&&travel>=short&&travel<long)this.emit(r,{gesture:'bow-short',strength:.5},p.time);
             this.bow=null;
