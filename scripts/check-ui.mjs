@@ -91,7 +91,7 @@ await motion.route(/@mediapipe_tasks-vision\.js/,route=>route.fulfill({contentTy
 await motion.goto(`${baseURL}/?instrument=dombyra`);
 await motion.getByRole('button',{name:'Включить камеру',exact:true}).click();
 await motion.getByText('ИЩЕМ РУКУ',{exact:true}).waitFor();
-async function move(x,y){await motion.evaluate(({x,y})=>{const points=Array.from({length:21},()=>({x:1-x,y,z:0}));points[0].y=y+.12;points[4]={x:1-(x-.025),y:y-.04,z:0};points[8]={x:1-(x+.095),y:y-.10,z:0};window.__landmarks=points;},{x,y});await motion.waitForTimeout(110);}
+async function move(x,y,pinch=false){await motion.evaluate(({x,y,pinch})=>{const points=Array.from({length:21},()=>({x:1-x,y,z:0}));points[0].y=y+.12;points[4]={x:1-(x-.025),y:y-.04,z:0};points[8]={x:1-(x+(pinch?-.01:.095)),y:y-(pinch?.04:.10),z:0};window.__landmarks=points;},{x,y,pinch});await motion.waitForTimeout(110);}
 await move(.65,.43);
 await motion.getByText('СЛЕДУЮЩИЙ ПРИЁМ',{exact:true}).waitFor();
 for(const y of [.46,.50,.54,.59,.65,.71])await move(.65,y);
@@ -102,10 +102,20 @@ await motion.getByRole('button',{name:'Скрыть AR-инструмент'}).c
 for(const y of [.71,.67,.62,.56,.50])await move(.65,y);
 await motion.locator('.gesture-control.expected').filter({hasText:'Щипок струны'}).waitFor();
 if(!(await motion.locator('.session-stats').innerText()).includes('200'))throw Error('motion with hidden AR did not score');
+async function pluck(){await move(.65,.60,true);await move(.65,.60,true);await move(.65,.60);}
+async function downstroke(){for(const y of [.46,.50,.54,.59,.65,.71])await move(.65,y);}
+async function upstroke(){for(const y of [.71,.67,.62,.56,.50])await move(.65,y);}
+await pluck();await downstroke();await pluck();await upstroke();await downstroke();await upstroke();await pluck();
+await motion.getByText('ТВОЁ ВЫСТУПЛЕНИЕ ЗАВЕРШЕНО',{exact:true}).waitFor();
+if(!(await motion.locator('.result-score').innerText()).startsWith('900'))throw Error('hands-free full performance failed');
+await motion.evaluate(()=>{window.__landmarks=null;});await motion.waitForTimeout(2800);
+await move(.65,.43);
+await motion.getByText('Совмести точку на кисти с меткой',{exact:true}).waitFor();
+await motion.getByText('СЛЕДУЮЩИЙ ПРИЁМ',{exact:true}).waitFor();
 await motion.reload();await motion.getByRole('button',{name:'Попробовать демо без камеры'}).click();
 await motion.getByRole('button',{name:'Показать AR-инструмент'}).waitFor();
 await motion.close();
-console.log(JSON.stringify({passed:['desktop render','filters','QR','demo final and scoring','persistence','timeout and replay','permission denied and demo fallback','QR deep link','MediaPipe camera initialization','mobile width','mobile navigation','all instrument scenarios','AR toggle and persistence','AR/video alignment','hands-free start and real motion event integration','hidden AR keeps recognizing'],errors}));
+console.log(JSON.stringify({passed:['desktop render','filters','QR','demo final and scoring','persistence','timeout and replay','permission denied and demo fallback','QR deep link','MediaPipe camera initialization','mobile width','mobile navigation','all instrument scenarios','AR toggle and persistence','AR/video alignment','hands-free start and real motion event integration','hidden AR keeps recognizing','hands-free 9-note result and replay'],errors}));
 if(errors.length)process.exitCode=1;
 } finally {
   await browser?.close();

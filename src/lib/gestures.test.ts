@@ -78,3 +78,11 @@ test('partial and tiny hands have actionable guidance',()=>{
 test('reset clears pending doubles and bow/strum history',()=>{
   const d=new MotionRecognizer('dauylpaz');feed(d,drum);d.reset();assert.equal(d.update(hand(.5,.63),720).event,null);
 });
+
+test('confirming a single drum hit does not erase the next raised stroke',()=>{
+  const d=new MotionRecognizer('dauylpaz');feed(d,drum);
+  for(const t of [320,400,480,560])d.update(hand(.5,.48),t);
+  assert.equal(d.update(hand(.5,.48),650).event?.gesture,'drum-center');
+  d.update(hand(.5,.55),730);d.update(hand(.5,.63),810);
+  assert.equal(d.update(hand(.5,.63),1300).event?.gesture,'drum-center');
+});
