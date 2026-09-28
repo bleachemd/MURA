@@ -11,7 +11,7 @@ export function playNote(gesture: Gesture, instrument = 'dombyra') {
   const ctx = context;
   const now = ctx.currentTime;
   const percussion = gesture === 'fist' || instrument === 'dauylpaz';
-  const freq = percussion ? (gesture === 'peace' ? 170 : 105) : gesture === 'palm' ? 293.66 : 440;
+  const freq = percussion ? (gesture === 'peace' ? 180 : gesture === 'palm' ? 110 : 70) : gesture === 'palm' ? 293.66 : 440;
   const duration = instrument === 'kobyz' && !percussion ? 1.3 : .85;
   const gain = ctx.createGain();
   gain.gain.setValueAtTime(.001, now);

@@ -1,6 +1,10 @@
+import { existsSync, mkdirSync } from 'node:fs';
 import { chromium } from '@playwright/test';
-const browser = await chromium.launch({executablePath:'/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',headless:true,args:['--use-fake-ui-for-media-stream','--use-fake-device-for-media-stream']});
-const page = await browser.newPage({viewport:{width:1440,height:1120}});
+mkdirSync('artifacts', { recursive: true });
+const localChrome='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const executablePath=process.env.CHROME_PATH || (existsSync(localChrome)?localChrome:undefined);
+const browser = await chromium.launch({executablePath,headless:true,args:['--use-fake-ui-for-media-stream','--use-fake-device-for-media-stream']});
+const page = await browser.newPage({viewport:{width:1440,height:1120},reducedMotion:'reduce'});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 await page.goto('http://localhost:5173');await page.evaluate(()=>document.fonts.ready);
 await page.screenshot({path:'artifacts/desktop.png',fullPage:true});
@@ -28,6 +32,7 @@ await page.getByText('Покажи руку целиком перед камер
 await page.screenshot({path:'artifacts/camera.png'});
 await page.keyboard.press('Escape');
 await page.setViewportSize({width:390,height:844});
+await page.getByRole('heading',{name:'Музыка в твоих руках.'}).click();
 await page.screenshot({path:'artifacts/mobile.png',fullPage:true});
 const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>window.innerWidth);if(overflow)throw Error('mobile horizontal overflow');
 await page.getByRole('button',{name:'Открыть меню'}).click();await page.getByRole('button',{name:'Как это работает',exact:true}).click();
