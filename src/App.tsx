@@ -1,6 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, AudioLines, BadgeCheck, Camera, CheckCheck, ChevronRight, CircleHelp, Copy, Download, ExternalLink, Globe2, Hand, Landmark, Menu, Music2, Play, QrCode, ScanLine, ShieldCheck, Sparkles, Trophy, Volume2, VolumeX, X } from 'lucide-react';
-import QRCode from 'qrcode';
 import { InstrumentArt } from './components/InstrumentArt';
 import { Session, type Instrument } from './components/Session';
 import { getProgress, topScores } from './lib/progress';
@@ -35,7 +34,7 @@ export default function App() {
   const board = boardFilter==='all' ? topScores(undefined,10) : topScores(instruments.find(i=>i.id===boardFilter)?.name,10);
   const url = qr ? `${location.origin}${location.pathname}?instrument=${qr.id}` : '';
   useEffect(()=> { setSound(sound); },[sound]);
-  useEffect(()=> { if (!qr) return; let active = true; setQrImage(''); setQrError(''); setCopied(false); QRCode.toDataURL(url,{ width: 520, margin: 2, color: { dark: '#204b3c', light: '#ffffff' } }).then(image=>{if(active)setQrImage(image);}).catch(()=>{if(active)setQrError('qrm.err');}); return()=>{active=false;}; },[qr,url]);
+  useEffect(()=> { if (!qr) return; let active = true; setQrImage(''); setQrError(''); setCopied(false); import('qrcode').then(({default:QRCode})=>QRCode.toDataURL(url,{ width: 520, margin: 2, color: { dark: '#204b3c', light: '#ffffff' } })).then(image=>{if(active)setQrImage(image);}).catch(()=>{if(active)setQrError('qrm.err');}); return()=>{active=false;}; },[qr,url]);
   useEffect(()=> {
     if (!session && !qr) return;
     const previous = document.activeElement as HTMLElement; document.body.style.overflow='hidden';

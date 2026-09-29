@@ -15,11 +15,23 @@ const buzz = (pattern: number | number[]) => { try { navigator.vibrate?.(pattern
 /** Hand-tracking noise is not technique advice; keep it out of the post-performance review. */
 const noise = new Set(['hand-lost', 'ready-lost', 'ready-target', 'reacquired', 'brief-gap', 'jitter', 'setup']);
 const connections = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[0,17],[17,18],[18,19],[19,20]];
+type Tracker = { model: HandLandmarker; delegate: 'GPU' | 'CPU'; make: (d: 'GPU' | 'CPU') => Promise<HandLandmarker> };
+/** Downloads (~11 MB of wasm and weights) and builds the hand model: GPU first, CPU where the GPU delegate fails. */
+async function loadTracker(): Promise<Tracker> {
+  const {FilesetResolver,HandLandmarker}=await import('@mediapipe/tasks-vision');const vision=await FilesetResolver.forVisionTasks('/wasm');
+  const options={runningMode:'VIDEO' as const,numHands:2,minHandDetectionConfidence:.5,minHandPresenceConfidence:.45,minTrackingConfidence:.4};
+  const make=(d:'GPU'|'CPU')=>HandLandmarker.createFromOptions(vision,{...options,baseOptions:{modelAssetPath:'/models/hand_landmarker.task',delegate:d}});
+  try{return {model:await make('GPU'),delegate:'GPU',make};}
+  catch{return {model:await make('CPU'),delegate:'CPU',make};}
+}
 export function Session({ instrument, close, onComplete, sound, toggleSound }: { instrument: Instrument; close: () => void; onComplete: () => void; sound: boolean; toggleSound: () => void }) {
   const profile=getProfile(instrument.id);const gestures=profile.gestures;const melody=getMelody(instrument.id);
   const {t,lang}=useI18n();const tRef=useRef(t);tRef.current=t;const langRef=useRef(lang);langRef.current=lang;
   const [phase,setPhase]=useState<Phase>('intro');
   const [mode,setMode]=useState<'live'|'demo'|null>(null);
+  // The model downloads from the moment the exhibit opens, not after the camera prompt: on a phone that download was most of the wait.
+  const tracker=useRef<Promise<Tracker>|undefined>(undefined);
+  useEffect(()=>{const p=loadTracker();tracker.current=p;p.catch(()=>{});return()=>{if(tracker.current===p){tracker.current=undefined;p.then(t=>t.model.close(),()=>{});}};},[]);
   const [loading,setLoading]=useState(false);const [error,setError]=useState('');
   const [guidance,setGuidance]=useState<CoachHint>(()=>coach('setup','Подготовь руку',profile.setup));const [recognized,setRecognized]=useState<Gesture|null>(null);
   const [handPresent,setHandPresent]=useState(false);const [contact,setContact]=useState<Point|null>(null);
@@ -188,6 +200,9 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
       if(video.current?.requestVideoFrameCallback){videoCallback=true;frame=video.current.requestVideoFrameCallback(loop);}
       else{videoCallback=false;frame=requestAnimationFrame(loop);}
     }
+    // Owned here from now on: kept on resolve so cleanup closes it, closed at once if the session is already gone.
+    const ready=(tracker.current??loadTracker()).then(t=>{if(cancelled)t.model.close();else{model=t.model;delegate=t.delegate;makeModel=t.make;}});
+    tracker.current=undefined;ready.catch(()=>{});
     async function init(){
       setLoading(true);setError('');
       try{
@@ -206,12 +221,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
         mirrored=stream.getVideoTracks()[0]?.getSettings().facingMode!=='environment';setMirror(mirrored);
         if(cancelled){stream.getTracks().forEach(t=>t.stop());return;}
         if(video.current){video.current.srcObject=stream;await video.current.play();}
-        const {FilesetResolver,HandLandmarker}=await import('@mediapipe/tasks-vision');const vision=await FilesetResolver.forVisionTasks('/wasm');if(cancelled)return;
-        const options={runningMode:'VIDEO' as const,numHands:2,minHandDetectionConfidence:.5,minHandPresenceConfidence:.45,minTrackingConfidence:.4};
-        makeModel=d=>HandLandmarker.createFromOptions(vision,{...options,baseOptions:{modelAssetPath:'/models/hand_landmarker.task',delegate:d}});
-        try{model=await makeModel('GPU');}
-        catch{if(cancelled)return;delegate='CPU';model=await makeModel('CPU');}
-        if(cancelled){model.close();return;}
+        await ready;if(cancelled)return;
         setLoading(false);reset();rateStart=performance.now();processed=0;schedule();
       }catch(e){
         stream?.getTracks().forEach(t=>t.stop());if(cancelled)return;setLoading(false);const name=(e as Error).name;console.warn('MURA: camera or model start failed',e);

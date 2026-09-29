@@ -9,9 +9,20 @@ export function setSound(value: boolean) { enabled=value;if(!value)stopBow(); }
  * unsupported AudioContext throws on construction; both would otherwise hang the caller.
  */
 export function unlockAudio(): Promise<void> {
+  // iOS plays Web Audio as "ambient" sound, which the ring/silent switch mutes: a phone on silent heard nothing at all.
+  const session=(globalThis.navigator as (Navigator & { audioSession?: { type: string } }) | undefined)?.audioSession;if(session)session.type='playback';
   try { context ??= new AudioContext(); } catch { return Promise.resolve(); }
-  if(context.state!=='suspended')return Promise.resolve();
+  if(context.state==='running')return Promise.resolve();
   return Promise.race([context.resume().catch(()=>{}), new Promise<void>(resolve=>{ setTimeout(resolve,400); })]);
+}
+/**
+ * Mobile browsers suspend a running context behind the page's back (iOS "interrupted": camera
+ * start, a call, an app switch) and never resume it, so every later note was dropped silently.
+ */
+function running() {
+  if(!enabled || !context)return;
+  if(context.state==='running')return context;
+  context.resume().catch(()=>{});
 }
 export function stopBow() {
   if(!bow || !context)return;
@@ -20,8 +31,8 @@ export function stopBow() {
 }
 /** The sustained kobyz tone follows actual bow movement, stopping when the hand stops. */
 export function updateBow(speed: number) {
-  if(!context || context.state!=='running' || !enabled || speed<.07){stopBow();return;}
-  const ctx=context;
+  const ctx=speed<.07?undefined:running();
+  if(!ctx){stopBow();return;}
   if(!bow) {
     const oscillator=ctx.createOscillator();oscillator.type='sawtooth';oscillator.frequency.value=146.83;
     const filter=ctx.createBiquadFilter();filter.type='lowpass';
@@ -34,8 +45,7 @@ export function updateBow(speed: number) {
 /** Seven strings tuned to a pentatonic scale: G3 A3 C4 D4 E4 G4 A4. */
 const zhetygenTuning=[196,220,261.63,293.66,329.63,392,440];
 export function playNote(gesture: Gesture, instrument = 'dombyra', strength=.7) {
-  if(!enabled || !context || context.state!=='running')return;
-  const ctx=context;const now=ctx.currentTime;const volume=.12+Math.min(1,Math.max(0,strength))*.14;
+  const live=running();if(!live)return;const ctx=live;const now=ctx.currentTime;const volume=.12+Math.min(1,Math.max(0,strength))*.14;
   function pluck(frequency: number,delay: number,level: number) {
     const duration=.95;const length=Math.round(ctx.sampleRate/frequency);const buffer=ctx.createBuffer(1,ctx.sampleRate*duration,ctx.sampleRate);const data=buffer.getChannelData(0);const ring=new Float32Array(length);
     for(let i=0;i<length;i++)ring[i]=Math.random()*2-1;
@@ -59,8 +69,7 @@ export function playNote(gesture: Gesture, instrument = 'dombyra', strength=.7) 
 export type Cue = 'good' | 'miss' | 'start' | 'finish' | 'record';
 /** Tiny synthesized interface sounds: a bright ping, a soft low drop, a rising start, a finish arpeggio. */
 export function playCue(kind: Cue) {
-  if(!enabled || !context || context.state!=='running')return;
-  const ctx=context;const t0=ctx.currentTime;
+  const ctx=running();if(!ctx)return;const t0=ctx.currentTime;
   const tone=(frequency:number,at:number,length:number,level:number,type:OscillatorType='sine',slideTo?:number)=>{
     const osc=ctx.createOscillator();osc.type=type;osc.frequency.setValueAtTime(frequency,t0+at);
     if(slideTo)osc.frequency.exponentialRampToValueAtTime(slideTo,t0+at+length);
