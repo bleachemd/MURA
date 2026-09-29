@@ -50,6 +50,7 @@ export default function App() {
   async function listen(i: Instrument) {clearTimeout(previewTimer.current);clearTimeout(previewEnd.current);if(preview===i.id){setPreview(null);return;}await unlockAudio().catch(()=>{});setPreview(i.id);playNote(getProfile(i.id).gestures[0].id,i.id);previewTimer.current=setTimeout(()=>playNote(getProfile(i.id).gestures[1].id,i.id),450);previewEnd.current=setTimeout(()=>setPreview(null),1800);}
   const nav = ([['collection',Music2],['guide',ScanLine],['progress',Trophy],['about',Landmark]] as const).map(([id,icon])=>({id:id as Page,icon,label:t(`nav.${id}`)}));
   return <div className="app-shell">
+    {mobileNav&&<div className="nav-backdrop" onClick={()=>setMobileNav(false)}/>}
     <aside className={`sidebar ${mobileNav?'mobile-open':''}`}><a className="brand" href="#" onClick={e=>{e.preventDefault();navigate('collection');}}><Mark/><div>MURA<span>{t('side.tag')}</span></div></a><span className="nav-caption">{t('side.caption')}</span><nav>{nav.map(item=><button key={item.id} className={page===item.id?'active':''} onClick={()=>navigate(item.id)}><item.icon size={19}/>{item.label}{page===item.id&&<span className="nav-dot"/>}</button>)}</nav>
       <div className="sidebar-bottom"><div className="sidebar-invitation"><Ornament/><span>{t('side.inv1')}</span><p>{t('side.inv2')}</p><span className="invitation-line"/></div><div className="sidebar-footer"><span>{t('side.made')}</span><span className="kz-mark">KZ <span>✦</span></span></div></div>
     </aside>

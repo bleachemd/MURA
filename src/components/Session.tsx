@@ -258,11 +258,11 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
         </div>
         <p className="privacy-note"><ShieldCheck size={15}/> {t('s.privacy')}</p>
       </div>
-    </div>:<div className="session-play">
+    </div>:<div className={`session-play ${mode} ${phase}`}>
       <div className="session-main">
         <div className="session-bar">
           <div className="session-stats"><span><b>{seconds}</b> {trackingPaused?t('s.paused'):t('s.sec')}</span><span><b>{index}</b> {t('s.of9')}</span><span><b>{score}</b> {t('s.points')}</span>{streak>=2&&<span className="streak" key={streak}>{t('s.streak',{n:streak})}</span>}</div>
-          <button className={`ar-toggle ${showAR?'is-on':''}`} aria-pressed={showAR} onClick={()=>setShowAR(!showAR)}>{showAR?<EyeOff size={16}/>:<Eye size={16}/>} {showAR?t('s.arHide'):t('s.arShow')}</button>
+          <button className={`ar-toggle ${showAR?'is-on':''}`} aria-pressed={showAR} aria-label={showAR?t('s.arHide'):t('s.arShow')} title={showAR?t('s.arHide'):t('s.arShow')} onClick={()=>setShowAR(!showAR)}>{showAR?<EyeOff size={16}/>:<Eye size={16}/>} <span>{showAR?t('s.arHide'):t('s.arShow')}</span></button>
         </div>
         {lite&&<div className="lite-note"><span>{t('lite.note')}</span><button className="text-button" onClick={()=>{autoLite.current=false;liteRef.current=false;lowRate.current=0;setLite(false);}}>{t('lite.restore')}</button></div>}
         <div ref={stage} className={`camera-stage motion-stage ${flash?'note-flash':''} ${miss?'note-miss':''}`} style={{aspectRatio:aspect}}>
