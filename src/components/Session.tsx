@@ -109,7 +109,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
   },[mode,aspect]);
   useEffect(()=>{
     if(mode!=='live')return;
-    let cancelled=false;let stream:MediaStream|undefined;let model:HandLandmarker|undefined;let frame=0;let previousFrame=-1;let lastTime=0;let lastPaint=0;let rateStart=performance.now();let workMs=0;let delegate:'GPU'|'CPU'='GPU';let swapping=false;let makeModel:((d:'GPU'|'CPU')=>Promise<HandLandmarker>)|undefined;let processed=0;let anchor:Point=profile.ready;let videoCallback=false;
+    let cancelled=false;let stream:MediaStream|undefined;let model:HandLandmarker|undefined;let frame=0;let previousFrame=-1;let lastTime=0;let lastPaint=0;let rateStart=performance.now();let workMs=0;let delegate:'GPU'|'CPU'='GPU';let swapping=false;let makeModel:((d:'GPU'|'CPU')=>Promise<HandLandmarker>)|undefined;let processed=0;let anchor:Point=profile.ready;let videoCallback=false;let starved=0;
     const draw=(points:Point[],valid:boolean)=>{
       const c=canvas.current;const v=video.current;if(!c||!v)return;
       if(c.width!==(v.videoWidth||640))c.width=v.videoWidth||640;if(c.height!==(v.videoHeight||480))c.height=v.videoHeight||480;const ctx=c.getContext('2d');if(!ctx)return;
@@ -131,7 +131,11 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
           if(now-rateStart>1500){
             const rate=Math.round(processed*1000/(now-rateStart));const avgWork=processed?workMs/processed:0;
             // GPU delegate without hardware acceleration falls back to a software renderer that runs at ~1 fps; the CPU delegate is far faster there.
-            if(delegate==='GPU'&&!swapping&&makeModel&&processed>=2&&avgWork>110){swapping=true;const old=model;makeModel('CPU').then(next=>{if(cancelled){next.close();return;}model=next;delegate='CPU';old?.close();}).catch(()=>{}).finally(()=>{swapping=false;});}setTrackingRate(rate);processed=0;workMs=0;rateStart=now;
+            // A software GPU renderer manages barely one frame per 1.5s window, so the
+            // two-frame guard below used to exclude the very case it exists to rescue.
+            // Two consecutive windows with a single, absurdly slow frame count as well.
+            starved=processed>=1&&processed<2&&avgWork>400?starved+1:0;
+            if(delegate==='GPU'&&!swapping&&makeModel&&((processed>=2&&avgWork>110)||starved>=2)){swapping=true;starved=0;const old=model;makeModel('CPU').then(next=>{if(cancelled){next.close();return;}model=next;delegate='CPU';old?.close();}).catch(()=>{}).finally(()=>{swapping=false;});}setTrackingRate(rate);processed=0;workMs=0;rateStart=now;
             if(autoLite.current&&!liteRef.current&&!document.hidden&&s.phase!=='done'){lowRate.current=rate<22&&avgWork>32?lowRate.current+1:0;if(lowRate.current>=2){liteRef.current=true;setLite(true);}}
           }
           if(paint){lastPaint=now;setHandPresent(!quality);}
