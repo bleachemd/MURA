@@ -76,4 +76,3 @@
 @media(max-width:520px){
   .page-content{padding-left:max(19px,env(safe-area-inset-left));padding-right:max(19px,env(safe-area-inset-right))}
 }
-.kui-picker{margin-bottom:14px}.kui-picker .guide-instrument-picker{margin:8px 0}.kui-picker p{display:flex;align-items:center;gap:10px}

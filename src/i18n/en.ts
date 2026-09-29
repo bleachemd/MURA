@@ -296,9 +296,4 @@ export const en: Record<string, string> = {
   'inst.dombyra.tag': 'Perfect to start with',
   'inst.kobyz.tag': 'A deep, drawn-out voice',
   'inst.dauylpaz.tag': 'Catch the rhythm',
-  'kui.title': 'Learn the kui “Nar Agashy” part by part',
-  'kui.free': 'Exercise',
-  'kui.part': 'Part {n}',
-  'kui.listen': 'Listen to the part',
-  'kui.next': 'Next: part {n}',
 };

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, Check, CircleAlert, Eye, EyeOff, Lightbulb, LoaderCircle, Maximize, Play, RotateCcw, ShieldCheck, Trophy, Volume2, VolumeX, X } from 'lucide-react';
+import { Camera, Check, CircleAlert, Eye, EyeOff, Lightbulb, LoaderCircle, Maximize, RotateCcw, ShieldCheck, Trophy, Volume2, VolumeX, X } from 'lucide-react';
 import type { HandLandmarker } from '@mediapipe/tasks-vision';
-import { distance, getMelody, getProfile, handQuality, narAgashy, palmPoint, selectHand, MotionRecognizer, type Gesture, type Point } from '../lib/gestures';
+import { distance, getMelody, getProfile, handQuality, palmPoint, selectHand, MotionRecognizer, type Gesture, type Point } from '../lib/gestures';
 import { playCue, playNote, stopBow, unlockAudio, updateBow } from '../lib/audio';
 import { getProgress, savePerformance, topScores, type Performance, type Tip } from '../lib/progress';
 import { localizeHint, locales, useI18n } from '../i18n';
@@ -16,7 +16,7 @@ const buzz = (pattern: number | number[]) => { try { navigator.vibrate?.(pattern
 const noise = new Set(['hand-lost', 'ready-lost', 'ready-target', 'reacquired', 'brief-gap', 'jitter', 'setup']);
 const connections = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[0,17],[17,18],[18,19],[19,20]];
 export function Session({ instrument, close, onComplete, sound, toggleSound }: { instrument: Instrument; close: () => void; onComplete: () => void; sound: boolean; toggleSound: () => void }) {
-  const profile=getProfile(instrument.id);const gestures=profile.gestures;const [part,setPart]=useState<number|null>(null);const melody=part===null?getMelody(instrument.id):narAgashy[part];
+  const profile=getProfile(instrument.id);const gestures=profile.gestures;const melody=getMelody(instrument.id);
   const {t,lang}=useI18n();const tRef=useRef(t);tRef.current=t;const langRef=useRef(lang);langRef.current=lang;
   const [phase,setPhase]=useState<Phase>('intro');
   const [mode,setMode]=useState<'live'|'demo'|null>(null);
@@ -34,7 +34,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
   const [aspect,setAspect]=useState(4/3);const [viewport,setViewport]=useState({width:0,height:0});
   const stage=useRef<HTMLDivElement>(null);const video=useRef<HTMLVideoElement>(null);const canvas=useRef<HTMLCanvasElement>(null);
   const detector=useRef(new MotionRecognizer(instrument.id));
-  const state=useRef({phase,index,mistakes,mode,melody,start:0,finished:0});
+  const state=useRef({phase,index,mistakes,mode,start:0,finished:0});
   const dwell=useRef<{since:number;anchor:Point|null;replayArmed:boolean;missingSince:number;frames:Point[][]}>({since:0,anchor:null,replayArmed:false,missingSince:0,frames:[]});
   const action=useRef<(g:Gesture,strength?:number)=>void>(()=>{});const finishRef=useRef<()=>void>(()=>{});const beginRef=useRef<()=>void>(()=>{});
   const stats=useRef({wrong:{} as Record<string,number>,tips:new Map<string,Tip>(),streak:0,bestStreak:0,lastTip:''});const lastPoint=useRef<Point|null>(null);const popId=useRef(0);const missTimeout=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
@@ -57,7 +57,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
   }
   function resetStats(){stats.current={wrong:{},tips:new Map(),streak:0,bestStreak:0,lastTip:''};setStreak(0);setPops([]);setSummary(null);}
   const pause=useRef({since:0,missingSince:0});const flashTimeout=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);const noteTimeout=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
-  state.current={...state.current,phase,index,mistakes,mode,melody};
+  state.current={...state.current,phase,index,mistakes,mode};
   const score=Math.max(0,index*100-mistakes*25);
   function reset() {
     stopBow();detector.current.reset();resetStats();dwell.current={since:0,anchor:null,replayArmed:false,missingSince:0,frames:[]};
@@ -65,7 +65,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
   }
   beginRef.current=()=>{
     const s=state.current;s.phase='playing';s.index=0;s.mistakes=0;s.start=Date.now();detector.current.reset();resetStats();playCue('start');detector.current.calibrate(dwell.current.frames);setCalibrated(s.mode==='live');pause.current={since:0,missingSince:0};setTrackingPaused(false);
-    setPhase('playing');setIndex(0);setMistakes(0);setSeconds(45);setReadyProgress(0);const first=gestures.find(g=>g.id===melody[0])!;publish.current(coach('begin',first.name,first.instruction),performance.now(),true);
+    setPhase('playing');setIndex(0);setMistakes(0);setSeconds(45);setReadyProgress(0);publish.current(coach('begin',gestures[0].name,gestures[0].instruction),performance.now(),true);
   };
   finishRef.current=()=>{
     const s=state.current;if(s.phase!=='playing')return;
@@ -156,7 +156,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
               if(pause.current.since){s.start+=Date.now()-pause.current.since;setTrackingPaused(false);}
               pause.current={since:0,missingSince:0};
             }
-            const result=detector.current.update(points,now,s.melody[s.index]);
+            const result=detector.current.update(points,now,melody[s.index]);
             if(paint){lastPoint.current=result.point;setContact(result.point);setTrace(liteRef.current?[]:result.trace);}
             draw(points,result.inZone&&!quality);
             if(instrument.id==='kobyz')updateBow(result.bowSpeed);
@@ -218,7 +218,6 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
     document.addEventListener('visibilitychange',onVisibility);void init();
     return()=>{cancelled=true;if(videoCallback)video.current?.cancelVideoFrameCallback(frame);else cancelAnimationFrame(frame);stream?.getTracks().forEach(t=>t.stop());model?.close();stopBow();document.removeEventListener('visibilitychange',onVisibility);};
   },[mode,instrument.id]);
-  async function listen(){await unlockAudio().catch(()=>{});melody.forEach((g,i)=>setTimeout(()=>playNote(g,instrument.id),i*380));}
   async function start(demo=false){await unlockAudio().catch(()=>{});setError('');setMode(demo?'demo':'live');if(demo){setLoading(false);reset();}}
   const expected=gestures.find(g=>g.id===melody[index]);
   const status=mode==='demo'?t('s.st.demo'):trackingPaused?t('s.st.paused'):handPresent?t('s.st.hand'):t('s.st.search');
@@ -238,7 +237,6 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
         <h3>{feel[0]}<br/>{feel[1]}</h3>
         <p className="lead">{t(`setup.${instrument.id}`)}</p>
         <div className="intro-gestures">{gestures.map(g=><div key={g.id}><span className="technique-symbol">{g.symbol}</span><div><b>{gname(g.id)}</b><small>{t(`g.${g.id}.action`)}</small></div></div>)}</div>
-        {instrument.id==='dombyra'&&<div className="kui-picker"><b>{t('kui.title')}</b><div className="guide-instrument-picker" role="group" aria-label={t('kui.title')}>{[null,...narAgashy.keys()].map(n=><button key={n??'free'} className={part===n?'selected':''} aria-pressed={part===n} onClick={()=>setPart(n)}>{n===null?t('kui.free'):t('kui.part',{n:n+1})}</button>)}</div>{part!==null&&<p><button className="text-button" disabled={!sound} onClick={()=>void listen()}><Play size={14}/> {t('kui.listen')}</button> <span className="technique-symbol">{melody.map(g=>gestures.find(x=>x.id===g)?.symbol).join(' ')}</span></p>}</div>}
         <p className="intro-challenge">{t('s.challenge')}</p>
         <div className="intro-cta">
           <button className="button primary" onClick={()=>void start()}><Camera size={18}/> {t('s.camera')}</button>
@@ -263,7 +261,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
           {loading&&<div className="stage-overlay"><LoaderCircle className="spin" size={36}/><h3>{t('s.loading.t')}</h3><p>{t('s.loading.d')}</p></div>}
           {error&&<div className="stage-overlay"><Camera size={32}/><h3>{t('s.err.title')}</h3><p>{t('err.'+error)}</p><button className="button light" onClick={()=>{setMode(null);setPhase('intro');setError('');}}>{t('s.retry')}</button><button className="text-button light-text" onClick={()=>void start(true)}>{t('s.openDemo')}</button></div>}
           {!loading&&!error&&phase==='ready'&&(mode==='demo'?<div className="demo-ready"><p>{t('s.demoReady')}</p><button className="button light" onClick={()=>beginRef.current()}>{t('s.start')}</button></div>:<div className="motion-ready-label"><b>{t('s.ready.t')}</b><span>{t('s.ready.d')}</span><div className="ready-meter"><i style={{'--p':readyProgress} as React.CSSProperties}/></div></div>)}
-          {phase==='done'&&<div className="stage-overlay result-overlay"><div className="trophy-circle"><Trophy size={30}/></div><span className="muted">{mode==='demo'?t('s.res.demo'):t('s.res.live')}</span><h3>{index===9?t('s.res.good'):t('s.res.ok')}</h3><div className="result-score">{score}<span> {t('s.res.of')}</span></div><p>{t('s.res.detail',{n:index,m:mistakes})}</p><button className="button light" onClick={reset}><RotateCcw size={16}/> {t('s.again')}</button>{part!==null&&part<narAgashy.length-1&&<button className="button light" onClick={()=>{setPart(part+1);reset();}}>{t('kui.next',{n:part+2})}</button>}{mode==='live'&&<small>{t('s.hint')}</small>}<small>{saved?mode==='demo'?t('s.saved.demo'):t('s.saved.live'):t('s.saved.fail')}</small></div>}
+          {phase==='done'&&<div className="stage-overlay result-overlay"><div className="trophy-circle"><Trophy size={30}/></div><span className="muted">{mode==='demo'?t('s.res.demo'):t('s.res.live')}</span><h3>{index===9?t('s.res.good'):t('s.res.ok')}</h3><div className="result-score">{score}<span> {t('s.res.of')}</span></div><p>{t('s.res.detail',{n:index,m:mistakes})}</p><button className="button light" onClick={reset}><RotateCcw size={16}/> {t('s.again')}</button>{mode==='live'&&<small>{t('s.hint')}</small>}<small>{saved?mode==='demo'?t('s.saved.demo'):t('s.saved.live'):t('s.saved.fail')}</small></div>}
         </div>
         <div className="session-footer"><span><Maximize size={14}/> {showAR?t('s.foot.zone'):t('s.foot.arHidden')}</span><span><ShieldCheck size={14}/> {mode==='live'&&calibrated?t('s.foot.adapted'):''}{mode==='live'&&trackingRate>0?t('s.foot.fps',{n:trackingRate}):t('s.foot.video')}</span></div>
       </div>

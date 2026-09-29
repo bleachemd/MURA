@@ -24,10 +24,6 @@ const profiles: Record<InstrumentId, InstrumentProfile> = {
 };
 export function getProfile(instrument: string): InstrumentProfile { return profiles[instrument as InstrumentId] ?? profiles.dombyra; }
 export function getMelody(instrument: string): Gesture[] { const g = getProfile(instrument).gestures; return [0,1,2,0,2,1,0,1,2].map(i => g[i].id); }
-/** Dombyra kui «Нар агашы», learned part by part. Each part keeps the session's nine strokes: ↓ strum down, ↑ strum up, ⌁ pluck. */
-// ponytail: draft stroke pattern, not checked against a recording of the kui — replace with the real қағыс.
-const strokes: Record<string, Gesture> = { '↓': 'strum-down', '↑': 'strum-up', '⌁': 'pluck' };
-export const narAgashy: Gesture[][] = ['↓↓↑↓↑↓↓↑⌁', '↓↑⌁↓↑⌁↓↑↓', '⌁↓↑↓⌁↓↑↓↓'].map(part => [...part].map(s => strokes[s]));
 export const distance = (a: Point, b: Point) => Math.hypot(a.x-b.x, a.y-b.y);
 const clamp = (n: number, low: number, high: number) => Math.max(low, Math.min(high, n));
 const median = (values: number[]) => [...values].sort((a,b)=>a-b)[Math.floor(values.length/2)] ?? 0;
