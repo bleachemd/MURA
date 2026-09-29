@@ -65,3 +65,14 @@
 .motion-stage{height:auto;width:100%;max-height:calc(100dvh - 232px);min-height:300px}
 .session-inner{padding-bottom:max(16px,env(safe-area-inset-bottom))}
 @media(max-width:520px){.session-inner{gap:12px}.summary-stats{gap:6px}.summary-stats div{padding:9px}}
+/* viewport-fit=cover отдаёт странице всю площадь экрана, включая вырез и системную
+   полосу, поэтому отступы под них задаём сами. Шапка на телефоне липкая, а сайдбар
+   фиксированный — без этого они уезжают под чёлку. */
+@media(max-width:760px){
+  .topbar{height:calc(64px + env(safe-area-inset-top));padding-top:env(safe-area-inset-top);padding-left:max(23px,env(safe-area-inset-left));padding-right:max(23px,env(safe-area-inset-right))}
+  .sidebar{top:calc(64px + env(safe-area-inset-top));padding-bottom:calc(23px + env(safe-area-inset-bottom));padding-left:max(23px,env(safe-area-inset-left))}
+  .page-content{padding-left:max(23px,env(safe-area-inset-left));padding-right:max(23px,env(safe-area-inset-right));padding-bottom:env(safe-area-inset-bottom)}
+}
+@media(max-width:520px){
+  .page-content{padding-left:max(19px,env(safe-area-inset-left));padding-right:max(19px,env(safe-area-inset-right))}
+}
