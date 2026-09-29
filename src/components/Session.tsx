@@ -109,7 +109,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
   },[mode,aspect]);
   useEffect(()=>{
     if(mode!=='live')return;
-    let cancelled=false;let stream:MediaStream|undefined;let model:HandLandmarker|undefined;let frame=0;let previousFrame=-1;let lastTime=0;let lastPaint=0;let rateStart=performance.now();let workMs=0;let processed=0;let anchor:Point=profile.ready;let videoCallback=false;
+    let cancelled=false;let stream:MediaStream|undefined;let model:HandLandmarker|undefined;let frame=0;let previousFrame=-1;let lastTime=0;let lastPaint=0;let rateStart=performance.now();let workMs=0;let delegate:'GPU'|'CPU'='GPU';let swapping=false;let makeModel:((d:'GPU'|'CPU')=>Promise<HandLandmarker>)|undefined;let processed=0;let anchor:Point=profile.ready;let videoCallback=false;
     const draw=(points:Point[],valid:boolean)=>{
       const c=canvas.current;const v=video.current;if(!c||!v)return;
       if(c.width!==(v.videoWidth||640))c.width=v.videoWidth||640;if(c.height!==(v.videoHeight||480))c.height=v.videoHeight||480;const ctx=c.getContext('2d');if(!ctx)return;
@@ -129,7 +129,9 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
           const center=quality?null:palmPoint(points);if(center)anchor=center;
           const paint=now-lastPaint>=(liteRef.current?120:60);processed++;
           if(now-rateStart>1500){
-            const rate=Math.round(processed*1000/(now-rateStart));const avgWork=processed?workMs/processed:0;setTrackingRate(rate);processed=0;workMs=0;rateStart=now;
+            const rate=Math.round(processed*1000/(now-rateStart));const avgWork=processed?workMs/processed:0;
+            // GPU delegate without hardware acceleration falls back to a software renderer that runs at ~1 fps; the CPU delegate is far faster there.
+            if(delegate==='GPU'&&!swapping&&makeModel&&processed>=2&&avgWork>110){swapping=true;const old=model;makeModel('CPU').then(next=>{if(cancelled){next.close();return;}model=next;delegate='CPU';old?.close();}).catch(()=>{}).finally(()=>{swapping=false;});}setTrackingRate(rate);processed=0;workMs=0;rateStart=now;
             if(autoLite.current&&!liteRef.current&&!document.hidden&&s.phase!=='done'){lowRate.current=rate<22&&avgWork>32?lowRate.current+1:0;if(lowRate.current>=2){liteRef.current=true;setLite(true);}}
           }
           if(paint){lastPaint=now;setHandPresent(!quality);}
@@ -189,8 +191,9 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
         if(video.current){video.current.srcObject=stream;await video.current.play();}
         const {FilesetResolver,HandLandmarker}=await import('@mediapipe/tasks-vision');const vision=await FilesetResolver.forVisionTasks('/wasm');if(cancelled)return;
         const options={runningMode:'VIDEO' as const,numHands:2,minHandDetectionConfidence:.5,minHandPresenceConfidence:.45,minTrackingConfidence:.4};
-        try{model=await HandLandmarker.createFromOptions(vision,{...options,baseOptions:{modelAssetPath:'/models/hand_landmarker.task',delegate:'GPU'}});}
-        catch{if(cancelled)return;model=await HandLandmarker.createFromOptions(vision,{...options,baseOptions:{modelAssetPath:'/models/hand_landmarker.task',delegate:'CPU'}});}
+        makeModel=d=>HandLandmarker.createFromOptions(vision,{...options,baseOptions:{modelAssetPath:'/models/hand_landmarker.task',delegate:d}});
+        try{model=await makeModel('GPU');}
+        catch{if(cancelled)return;delegate='CPU';model=await makeModel('CPU');}
         if(cancelled){model.close();return;}
         setLoading(false);reset();rateStart=performance.now();processed=0;schedule();
       }catch(e){
