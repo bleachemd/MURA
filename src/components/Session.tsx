@@ -109,7 +109,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
   },[mode,aspect]);
   useEffect(()=>{
     if(mode!=='live')return;
-    let cancelled=false;let stream:MediaStream|undefined;let model:HandLandmarker|undefined;let frame=0;let previousFrame=-1;let lastTime=0;let lastPaint=0;let rateStart=performance.now();let processed=0;let anchor:Point=profile.ready;let videoCallback=false;
+    let cancelled=false;let stream:MediaStream|undefined;let model:HandLandmarker|undefined;let frame=0;let previousFrame=-1;let lastTime=0;let lastPaint=0;let rateStart=performance.now();let workMs=0;let processed=0;let anchor:Point=profile.ready;let videoCallback=false;
     const draw=(points:Point[],valid:boolean)=>{
       const c=canvas.current;const v=video.current;if(!c||!v)return;
       if(c.width!==(v.videoWidth||640))c.width=v.videoWidth||640;if(c.height!==(v.videoHeight||480))c.height=v.videoHeight||480;const ctx=c.getContext('2d');if(!ctx)return;
@@ -122,15 +122,15 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
       const now=performance.now();
       const v=video.current;
       if(v&&model&&v.readyState>=2&&v.currentTime!==previousFrame&&now-lastTime>=28){
-        previousFrame=v.currentTime;lastTime=now;
+        previousFrame=v.currentTime;lastTime=now;const workStart=performance.now();
         try{
           const all=model.detectForVideo(v,now).landmarks.map(hand=>hand.map(p=>({...p,x:1-p.x})));
           const points=selectHand(all,anchor);const quality=handQuality(points);const s=state.current;
           const center=quality?null:palmPoint(points);if(center)anchor=center;
           const paint=now-lastPaint>=(liteRef.current?120:60);processed++;
           if(now-rateStart>1500){
-            const rate=Math.round(processed*1000/(now-rateStart));setTrackingRate(rate);processed=0;rateStart=now;
-            if(autoLite.current&&!liteRef.current&&!document.hidden&&s.phase!=='done'){lowRate.current=rate<16?lowRate.current+1:0;if(lowRate.current>=2){liteRef.current=true;setLite(true);}}
+            const rate=Math.round(processed*1000/(now-rateStart));const avgWork=processed?workMs/processed:0;setTrackingRate(rate);processed=0;workMs=0;rateStart=now;
+            if(autoLite.current&&!liteRef.current&&!document.hidden&&s.phase!=='done'){lowRate.current=rate<22&&avgWork>32?lowRate.current+1:0;if(lowRate.current>=2){liteRef.current=true;setLite(true);}}
           }
           if(paint){lastPaint=now;setHandPresent(!quality);}
           if(s.phase==='playing'){
@@ -164,7 +164,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
             }else if(!quality||!d.missingSince||now-d.missingSince>180){d.anchor=null;d.since=0;d.frames=[];if(paint)setReadyProgress(0);}
             if(s.phase==='ready'&&paint)publish.current(quality?coach('ready-lost','Покажи руку',quality,profile.ready,'warning'):onTarget?coach('calibrating','Настраиваюсь под твою руку','Задержи точку на метке ещё на мгновение.',profile.ready):coach('ready-target','Кисть к жёлтой метке','Совмести светящуюся точку с кругом. Нажимать ничего не нужно.',profile.ready),now);
           }
-        }catch{stopBow();setError('process');stream?.getTracks().forEach(t=>t.stop());return;}
+        workMs+=performance.now()-workStart;}catch{stopBow();setError('process');stream?.getTracks().forEach(t=>t.stop());return;}
       }
       schedule();
     };
@@ -177,7 +177,14 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
       setLoading(true);setError('');
       try{
         if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia)throw new Error('secure');
-        stream=await navigator.mediaDevices.getUserMedia({audio:false,video:{facingMode:'user',width:{ideal:640},height:{ideal:480},frameRate:{ideal:60,max:60}}});
+        // Some webcams (older Logitech models, virtual cameras) refuse a detailed request; fall back to simpler ones.
+        const attempts:MediaTrackConstraints[]=[{facingMode:'user',width:{ideal:640},height:{ideal:480},frameRate:{ideal:60,max:60}},{facingMode:'user',width:{ideal:640},height:{ideal:480}},{}];
+        let failure:unknown;
+        for(const video of attempts){
+          try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:Object.keys(video).length?video:true});failure=undefined;break;}
+          catch(err){failure=err;const n=(err as Error).name;if(n==='NotAllowedError'||n==='NotFoundError'||cancelled)break;}
+        }
+        if(!stream)throw failure;
         if(cancelled){stream.getTracks().forEach(t=>t.stop());return;}
         if(video.current){video.current.srcObject=stream;await video.current.play();}
         const {FilesetResolver,HandLandmarker}=await import('@mediapipe/tasks-vision');const vision=await FilesetResolver.forVisionTasks('/wasm');if(cancelled)return;
@@ -232,7 +239,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
           <div className="camera-viewport" style={{width:viewport.width||'100%',height:viewport.height||'100%'}}>
             {mode==='live'&&<><video ref={video} muted playsInline autoPlay onLoadedMetadata={e=>{const v=e.currentTarget;setAspect(v.videoWidth/v.videoHeight||4/3);}}/><canvas ref={canvas}/></>}
             {pops.map(p=><span key={p.id} className="score-pop" style={{left:`${p.x*100}%`,top:`${p.y*100}%`}}>+100</span>)}
-            {!loading&&!error&&<ARInstrument instrument={instrument.id} visible={showAR&&!lite} point={contact} trace={trace} active={recognized} target={phase==='playing'||phase==='ready'?guidance.target:undefined} ready={mode==='live'&&phase==='ready'} progress={readyProgress}/>}
+            {!loading&&!error&&<ARInstrument instrument={instrument.id} visible={showAR} point={contact} trace={trace} active={recognized} target={phase==='playing'||phase==='ready'?guidance.target:undefined} ready={mode==='live'&&phase==='ready'} progress={readyProgress}/>}
           </div>
           {!loading&&!error&&phase!=='done'&&<div className="camera-status"><span className={`live-dot ${handPresent||mode==='demo'?'':'muted'}`}/>{status}</div>}
           {loading&&<div className="stage-overlay"><LoaderCircle className="spin" size={36}/><h3>{t('s.loading.t')}</h3><p>{t('s.loading.d')}</p></div>}

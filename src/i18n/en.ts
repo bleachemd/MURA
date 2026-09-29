@@ -188,7 +188,7 @@ export const en: Record<string, string> = {
   'sum.clean': 'Clean technique: no tips needed.',
   'sum.weak': 'Missed most often',
   'sum.best': 'Your best',
-  'lite.note': 'Lite mode is on: the camera is giving few frames. Recognition works as usual.',
+  'lite.note': 'Lite mode is on: this device is struggling to keep up with the frames. Recognition works as usual.',
   'lite.restore': 'Restore full view',
   'ar.strings': 'Strings: sweep across',
   'ar.bow': 'Bow: keep one height',
