@@ -73,7 +73,7 @@ MediaPipe даёт 21 точку кисти. Всё остальное напи�
 npm ci
 npm run dev       # http://localhost:5173
 npm run build     # проверка типов + сборка в dist/
-npm test          # 47 юнит-тестов распознавания и аудио
+npm test          # 49 юнит-тестов распознавания и аудио
 npm run test:e2e  # браузерные сценарии (Playwright, нужен Chromium: npx playwright install chromium или CHROME_PATH)
 ```
 
