@@ -91,7 +91,10 @@
   nav button{font-size:15px;padding:15px 14px}
   .icon-button{width:44px;height:44px}
   .sound-button{padding:10px}
-  .breadcrumb{font-size:13px}
+  /* В шапке телефона место есть только для названия раздела: «Музей ›» прячем. */
+  .breadcrumb{font-size:0;gap:0;min-width:0;white-space:nowrap}
+  .breadcrumb svg{display:none}
+  .breadcrumb span{font-size:15px;font-weight:550;overflow:hidden;text-overflow:ellipsis}
   .lang-switch button{font-size:12px;padding:8px 9px}
   .eyebrow{font-size:10px;letter-spacing:1.5px}
 
@@ -118,8 +121,8 @@
   .session-inner:has(>.session-play:not(.done)){height:100%;min-height:0;gap:8px}
   .session-play:not(.done){flex:1;min-height:0;display:flex;flex-direction:column;align-items:stretch;gap:8px}
   .session-play:not(.done) .session-main{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
-  /* Сцена держит пропорции кадра и сжимается, только когда не хватает высоты; подсказки остаются внизу. */
-  .session-play:not(.done) .motion-stage{flex:0 1 auto;height:auto;min-height:180px;max-height:none}
+  /* Сцена забирает всю свободную высоту; кадр вписывается в неё по своим пропорциям. */
+  .session-play:not(.done) .motion-stage{flex:1 1 0;height:auto;min-height:180px;max-height:none;aspect-ratio:auto!important}
   .session-play.done .motion-stage{min-height:380px}
   .session-footer,.motion-instruction{display:none}
   .session-play.live .gesture-controls{display:none}
