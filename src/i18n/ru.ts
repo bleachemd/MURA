@@ -259,4 +259,9 @@ export const ru: Record<string, string> = {
   'inst.dombyra.tag': 'Идеально для начала',
   'inst.kobyz.tag': 'Глубокое звучание',
   'inst.dauylpaz.tag': 'Поймай ритм',
+  'kui.title': 'Выучи кюй «Нар агашы» по частям',
+  'kui.free': 'Упражнение',
+  'kui.part': 'Часть {n}',
+  'kui.listen': 'Послушать часть',
+  'kui.next': 'Дальше: часть {n}',
 };

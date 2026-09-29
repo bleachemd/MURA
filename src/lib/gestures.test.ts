@@ -1,7 +1,7 @@
 import {CoachLatch,coach} from './coaching';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {calibrateHand,getMelody,getProfile,handQuality,selectHand,MotionRecognizer,type Gesture,type Point} from './gestures';
+import {calibrateHand,getMelody,getProfile,narAgashy,handQuality,selectHand,MotionRecognizer,type Gesture,type Point} from './gestures';
 function hand(x:number,y:number,pinch=false):Point[]{
   const p=Array.from({length:21},()=>({x,y,z:0}));p[0]={x,y:y+.12,z:0};
   p[4]={x:x-.025,y:y-.04,z:0};p[8]={x:x+(pinch?-.01:.095),y:y-(pinch?.04:.10),z:0};
@@ -12,6 +12,7 @@ const down:[number,number][]=[[.65,.46],[.65,.50],[.65,.54],[.65,.59],[.65,.65],
 const drum:[number,number][]=[[.5,.42],[.5,.49],[.5,.56],[.5,.63]];
 test('every instrument has its own three techniques and nine-note scenario',()=>{
   for(const id of ['dombyra','kobyz','dauylpaz']){const ids=getProfile(id).gestures.map(g=>g.id);assert.equal(new Set(ids).size,3);assert.equal(getMelody(id).length,9);assert.ok(getMelody(id).every(g=>ids.includes(g)));}
+  const dombyra=getProfile('dombyra').gestures.map(g=>g.id);for(const part of narAgashy){assert.equal(part.length,9);assert.ok(part.every(g=>dombyra.includes(g)));}
 });
 test('no stationary hand or held pinch produces notes',()=>{
   for(const id of ['dombyra','kobyz','dauylpaz'])for(const pinch of [false,true]){const d=new MotionRecognizer(id);for(let t=0;t<3000;t+=80)assert.equal(d.update(hand(.5,.6,pinch),t).event,null);}

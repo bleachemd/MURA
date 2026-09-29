@@ -296,4 +296,9 @@ export const kk: Record<string, string> = {
   'inst.dombyra.tag': 'Бастауға өте қолайлы',
   'inst.kobyz.tag': 'Терең, созылмалы үн',
   'inst.dauylpaz.tag': 'Ырғақты ұста',
+  'kui.title': '«Нар ағашы» күйін бөлікпен үйрен',
+  'kui.free': 'Жаттығу',
+  'kui.part': '{n}-бөлік',
+  'kui.listen': 'Бөлікті тыңдау',
+  'kui.next': 'Келесі: {n}-бөлік',
 };
