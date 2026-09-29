@@ -84,7 +84,11 @@ export default function App() {
 
   useEffect(() => () => { clearTimeout(previewTimer.current); clearTimeout(previewEnd.current); clearTimeout(copyTimer.current); }, []);
 
-  function navigate(p: Page) { setPage(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }
+  function navigate(p: Page) {
+    setPage(p);
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    window.scrollTo({ top: 0, behavior: calm ? 'auto' : 'smooth' });
+  }
 
   async function listen(i: Instrument) {
     clearTimeout(previewTimer.current); clearTimeout(previewEnd.current);

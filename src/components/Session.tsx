@@ -58,6 +58,15 @@ export function Session({ instrument, close, onComplete }: { instrument: Instrum
   useEffect(()=>{if(phase!=='playing')return;const interval=setInterval(()=>{const remaining=Math.max(0,45-Math.floor((Date.now()-state.current.start-(pause.current.since?Date.now()-pause.current.since:0))/1000));setSeconds(remaining);if(!remaining)finishRef.current();},200);return()=>clearInterval(interval);},[phase]);
   useEffect(()=>()=>{clearTimeout(flashTimeout.current);clearTimeout(noteTimeout.current);stopBow();},[]);
   useEffect(()=>{try{localStorage.setItem('mura-show-ar',String(showAR));}catch{/* Optional preference. */}},[showAR]);
+  // Phones dim the screen while nobody touches it; keep it awake during a performance.
+  useEffect(()=>{
+    if(!mode||!('wakeLock' in navigator))return;
+    let lock:WakeLockSentinel|undefined;
+    const request=async()=>{try{lock=await navigator.wakeLock.request('screen');}catch{/* Optional: denied in low-power mode. */}};
+    const onVisible=()=>{if(!document.hidden)void request();};
+    void request();document.addEventListener('visibilitychange',onVisible);
+    return()=>{document.removeEventListener('visibilitychange',onVisible);void lock?.release();};
+  },[mode]);
   useEffect(()=>{
     const el=stage.current;if(!el)return;
     const resize=()=>{const width=Math.min(el.clientWidth,el.clientHeight*aspect);setViewport({width,height:width/aspect});};
@@ -177,7 +186,7 @@ export function Session({ instrument, close, onComplete }: { instrument: Instrum
           <div className="session-stats"><span><b>{seconds}</b> {trackingPaused?'пауза':'сек'}</span><span><b>{index}</b> из 9</span><span><b>{score}</b> баллов</span></div>
           <button className={`ar-toggle ${showAR?'is-on':''}`} aria-pressed={showAR} onClick={()=>setShowAR(!showAR)}>{showAR?<EyeOff size={16}/>:<Eye size={16}/>} {showAR?'Скрыть AR-инструмент':'Показать AR-инструмент'}</button>
         </div>
-        <div ref={stage} className={`camera-stage motion-stage ${flash?'note-flash':''}`}>
+        <div ref={stage} className={`camera-stage motion-stage ${flash?'note-flash':''}`} style={{aspectRatio:aspect}}>
           <div className="camera-viewport" style={{width:viewport.width||'100%',height:viewport.height||'100%'}}>
             {mode==='live'&&<><video ref={video} muted playsInline autoPlay onLoadedMetadata={e=>{const v=e.currentTarget;setAspect(v.videoWidth/v.videoHeight||4/3);}}/><canvas ref={canvas}/></>}
             {!loading&&!error&&<ARInstrument instrument={instrument.id} visible={showAR} point={contact} trace={trace} active={recognized} target={phase==='playing'||phase==='ready'?guidance.target:undefined} ready={mode==='live'&&phase==='ready'} progress={readyProgress}/>}
