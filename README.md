@@ -87,9 +87,8 @@ npm run test:e2e  # браузерные сценарии (Playwright, нуже�
 - Слабый свет, низкий FPS и перекрытие пальцев ухудшают распознавание.
 - Жетыген: касание определяется по позе пальцев (указательный — мизинец), а не по глубине, поэтому пороги подбирались на синтетических данных и могут требовать подстройки под конкретную камеру. Большой палец и вторая рука не учитываются; веб-камера над столом объективом вниз может показать струны зеркально.
 
-## Сроки и источники
+## источники
 
-Проект начат после старта хакатона: первый коммит — 28.09.2026, 20:12.
 
 - [MediaPipe Hand Landmarker](https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker/web_js) ([Apache 2.0](https://github.com/google-ai-edge/mediapipe/blob/master/LICENSE))
 - Техника домбры: [UNESCO — Dombra Kuy](https://ich.unesco.org/en/RL/kazakh-traditional-art-of-dombra-kuy-00996), [Smithsonian Folkways — Ilme](https://folkways.si.edu/aygul-ulkenbaeva/ilme/central-asia-islamica-world/music/track/smithsonian)
