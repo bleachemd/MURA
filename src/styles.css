@@ -95,7 +95,9 @@
   .breadcrumb{font-size:0;gap:0;min-width:0;white-space:nowrap}
   .breadcrumb svg{display:none}
   .breadcrumb span{font-size:15px;font-weight:550;overflow:hidden;text-overflow:ellipsis}
-  .lang-switch button{font-size:12px;padding:8px 9px}
+  .lang-switch button{font-size:12px;padding:8px 7px}
+  .topbar{gap:8px}
+  .topbar-actions{gap:4px}
   .eyebrow{font-size:10px;letter-spacing:1.5px}
 
   .session-top{padding-bottom:8px;gap:8px}
@@ -123,6 +125,7 @@
   .session-play:not(.done) .session-main{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
   /* Сцена забирает всю свободную высоту; кадр вписывается в неё по своим пропорциям. */
   .session-play:not(.done) .motion-stage{flex:1 1 0;height:auto;min-height:180px;max-height:none;aspect-ratio:auto!important}
+  .session-play.done{align-content:start}
   .session-play.done .motion-stage{min-height:380px}
   .session-footer,.motion-instruction{display:none}
   .session-play.live .gesture-controls{display:none}
@@ -173,7 +176,7 @@
 }
 @media(max-width:520px){
   .page-heading p{font-size:14px;line-height:1.6;max-width:none}
-  .hero p{font-size:14px;line-height:1.6}
+  .hero p{font-size:13px;line-height:1.6;max-width:215px;text-shadow:0 1px 10px #244e3f}
   .hero .button{font-size:15px}
   .hero-badge{font-size:9px}
   .hero-footnote{font-size:11px;white-space:normal}
