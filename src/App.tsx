@@ -19,7 +19,7 @@ type Page = 'collection' | 'guide' | 'progress' | 'about';
 const navIds: Page[] = ['collection', 'guide', 'progress', 'about'];
 
 /** Ram's-horn (koshkar-muiz) motif, the one ornament the whole interface borrows. */
-function Mark({ size = 30 }: { size?: number }) {
+function Mark({ size = 22 }: { size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 100 100" fill="none" aria-hidden="true"><path d="M50 8v84M50 24C4-6 2 46 36 40C42 8-8 6 22 50M50 24C96-6 98 46 64 40C58 8 108 6 78 50M50 76C4 106 2 54 36 60C42 92-8 94 22 50M50 76C96 106 98 54 64 60C58 92 108 94 78 50" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" /></svg>;
 }
 
@@ -56,7 +56,7 @@ export default function App() {
     if (!qr) return;
     let active = true;
     setQrImage(''); setQrError(''); setCopied(false);
-    QRCode.toDataURL(url, { width: 520, margin: 2, color: { dark: '#0b1620', light: '#ffffff' } })
+    QRCode.toDataURL(url, { width: 520, margin: 2, color: { dark: '#141110', light: '#ffffff' } })
       .then(image => { if (active) setQrImage(image); })
       .catch(() => { if (active) setQrError('qrm.err'); });
     return () => { active = false; };
@@ -65,7 +65,6 @@ export default function App() {
   useEffect(() => {
     if (!session && !qr) return;
     const previous = document.activeElement as HTMLElement;
-    document.body.style.overflow = 'hidden';
     dialogRef.current?.querySelector<HTMLElement>('button')?.focus();
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape') { setSession(null); setQr(null); }
@@ -77,16 +76,10 @@ export default function App() {
       }
     };
     document.addEventListener('keydown', handler);
-    return () => { document.body.style.overflow = ''; document.removeEventListener('keydown', handler); previous?.focus(); };
+    return () => { document.removeEventListener('keydown', handler); previous?.focus(); };
   }, [session, qr]);
 
   useEffect(() => () => { clearTimeout(previewTimer.current); clearTimeout(previewEnd.current); clearTimeout(copyTimer.current); }, []);
-
-  function navigate(p: Page) {
-    setPage(p);
-    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    window.scrollTo({ top: 0, behavior: calm ? 'auto' : 'smooth' });
-  }
 
   async function listen(i: Instrument) {
     clearTimeout(previewTimer.current); clearTimeout(previewEnd.current);
@@ -104,108 +97,98 @@ export default function App() {
       .catch(() => setQrError('qrm.copyErr'));
   }
 
-  return <div className="app-shell">
-    <header className="topbar">
-      <a className="brand" href="#" onClick={e => { e.preventDefault(); navigate('collection'); }} aria-label={t('brand.aria')}>
-        <Mark /><span className="brand-word">MURA</span>
-      </a>
-      <nav className="main-nav" aria-label={t('nav.aria')}>
-        {navIds.map(id => <button key={id} aria-current={page === id ? 'page' : undefined} onClick={() => navigate(id)}>{t(`nav.${id}`)}</button>)}
-      </nav>
-      <div className="topbar-actions">
-        <div className="lang-switch" role="group" aria-label={t('lang.aria')}>
-          {languages.map(l => <button key={l.id} aria-pressed={lang === l.id} lang={l.id} title={l.name} onClick={() => setLang(l.id)}>{l.label}</button>)}
-        </div>
-        <button className="icon-button sound-button" aria-pressed={sound} onClick={() => updateSound(!sound)} aria-label={sound ? t('sound.off') : t('sound.on')} title={sound ? t('sound.off') : t('sound.on')}>
-          {sound ? <Volume2 size={19} /> : <VolumeX size={19} />}
-        </button>
+  return <div className="app">
+    <a className="brand" href="#" onClick={e => { e.preventDefault(); setPage('collection'); }} aria-label={t('brand.aria')}>
+      <Mark /><span className="brand-word">MURA</span>
+    </a>
+    <nav className="app-nav" aria-label={t('nav.aria')}>
+      {navIds.map(id => <button key={id} aria-current={page === id ? 'page' : undefined} onClick={() => setPage(id)}>{t(`nav.${id}`)}</button>)}
+    </nav>
+    <div className="app-tools">
+      <div className="lang-switch" role="group" aria-label={t('lang.aria')}>
+        {languages.map(l => <button key={l.id} aria-pressed={lang === l.id} lang={l.id} title={l.name} onClick={() => setLang(l.id)}>{l.label}</button>)}
       </div>
-    </header>
+      <button className="icon-button sound-button" aria-pressed={sound} onClick={() => updateSound(!sound)} aria-label={sound ? t('sound.off') : t('sound.on')} title={sound ? t('sound.off') : t('sound.on')}>
+        {sound ? <Volume2 size={18} /> : <VolumeX size={18} />}
+      </button>
+    </div>
 
-    <main className="page-content">
-      {page === 'collection' && <>
-        <section className="hero">
-          <div className="hero-head">
-            <h1 className="display">{t('hero.title')}</h1>
-            <div className="hero-aside">
-              <p className="lead">{t('hero.lead')}</p>
-              <button className="button primary" onClick={() => setSession(instruments[0])}>{t('hero.cta')} <ArrowRight size={18} /></button>
-              <p className="hero-privacy"><ShieldCheck size={16} /> {t('hero.privacy')}</p>
+    <main className="app-main">
+      {/* The shelf is the app's home: three exhibits, one screen, no scroll. */}
+      {page === 'collection' && <div className="shelf">
+        <div className="shelf-row">
+          {instruments.map((i, n) => <article className="shelf-item" key={i.id}>
+            <div className="shelf-head">
+              <span className="label">{String(n + 1).padStart(2, '0')}</span>
+              <button className="qr-button" onClick={() => setQr(i)} aria-label={t('card.qr', { name: name(i.id) })} title={t('card.qrTitle')}><QrCode size={17} /></button>
             </div>
-          </div>
-          <div className="arches">
-            {instruments.map((i, n) => <article className={`instrument-card arch ${i.color}`} key={i.id} style={{ '--i': n } as React.CSSProperties}>
-              <div className="arch-tools">
-                <button className="qr-button" onClick={() => setQr(i)} aria-label={t('card.qr', { name: name(i.id) })} title={t('card.qrTitle')}><QrCode size={18} /></button>
+            <div className="shelf-art"><InstrumentArt type={i.id} /></div>
+            <div className="shelf-main">
+              <div className="shelf-body">
+                <h2 className="shelf-name">{name(i.id)}</h2>
+                <span className="shelf-kz">{t(`inst.${i.id}.alt`)}</span>
+                <span className="label shelf-label">{t(`inst.${i.id}.sub`)}</span>
               </div>
-              <div className="arch-art"><InstrumentArt type={i.id} /></div>
-              <div className="arch-body">
-                <h3 className="arch-name">{name(i.id)}</h3>
-                <span className="arch-kz">{t(`inst.${i.id}.alt`)}</span>
-                <p className="arch-line">{t(`inst.${i.id}.sub`)}</p>
-                <div className="arch-actions">
-                  <button className="button primary play-instrument" onClick={() => setSession(i)}>{t('card.play')}</button>
-                  <button className={`listen-button ${preview === i.id ? 'is-playing' : ''}`} disabled={!sound} onClick={() => void listen(i)} aria-label={t('card.listen', { name: name(i.id) })} title={sound ? t('card.listenTitle') : t('card.listenOff')}>
-                    {preview === i.id ? <AudioLines size={18} /> : <Play size={16} fill="currentColor" />}
-                  </button>
-                </div>
+              <div className="shelf-actions">
+                <button className="button primary play-instrument" onClick={() => setSession(i)}>{t('card.play')}</button>
+                <button className={`listen-button ${preview === i.id ? 'is-playing' : ''}`} disabled={!sound} onClick={() => void listen(i)} aria-label={t('card.listen', { name: name(i.id) })} title={sound ? t('card.listenTitle') : t('card.listenOff')}>
+                  {preview === i.id ? <AudioLines size={18} /> : <Play size={16} fill="currentColor" />}
+                </button>
               </div>
-            </article>)}
-          </div>
-        </section>
-
-        <section className="section">
-          <div className="section-head"><h2 className="display">{t('steps.title')}</h2></div>
-          <ol className="steps" style={{ listStyle: 'none', padding: 0, margin: 0 }}>
-            {[1, 2, 3].map(n => <li className="step" key={n}><span className="step-n">{n}</span><h3>{t(`steps.${n}.t`)}</h3><p>{t(`steps.${n}.d`)}</p></li>)}
-          </ol>
-        </section>
-
-        <section className="section">
-          <div className="mistake">
-            <div className="prose">
-              <h2 className="display">{t('mistake.title')}</h2>
-              <p>{t('mistake.body')}</p>
-              <button className="text-button" onClick={() => navigate('guide')}>{t('mistake.link')} <ArrowRight size={16} /></button>
             </div>
-            <div className="hint-stack">
-              {mistakeExamples.map(h => <div className="hint" key={h.who}><Lightbulb size={20} /><b>{t(`mistake.ex${h.n}.t`)}</b><span>{name(h.who)}. {t(`mistake.ex${h.n}.d`)}</span></div>)}
-            </div>
+          </article>)}
+        </div>
+        <div className="shelf-note label">
+          <span><ShieldCheck size={14} /> {t('hero.privacy')}</span>
+          <span>{t('s.challenge')}</span>
+        </div>
+      </div>}
+
+      {page === 'guide' && <div className="view"><div className="view-inner">
+        <div className="view-head">
+          <span className="label">{t('nav.guide')}</span>
+          <h1 className="display">{t('guide.title')}</h1>
+          <p className="lead">{t('guide.lead')}</p>
+        </div>
+        <div className="section">
+          <div className="tabs" role="group" aria-label={t('guide.tabs')}>
+            {instruments.map(i => <button key={i.id} aria-pressed={guideInstrument === i.id} onClick={() => setGuideInstrument(i.id)}>{name(i.id)}</button>)}
           </div>
-        </section>
-
-        <section className="section qr-banner">
-          <h2 className="display">{t('qr.banner')}</h2>
-          <button className="button secondary" onClick={() => setQr(instruments[0])}><QrCode size={18} /> {t('qr.try')}</button>
-        </section>
-      </>}
-
-      {page === 'guide' && <>
-        <div className="page-heading"><h1 className="display">{t('guide.title')}</h1><p className="lead">{t('guide.lead')}</p></div>
-        <div className="tabs" role="group" aria-label={t('guide.tabs')}>
-          {instruments.map(i => <button key={i.id} aria-pressed={guideInstrument === i.id} onClick={() => setGuideInstrument(i.id)}>{name(i.id)}</button>)}
+          <div className="guide-grid">
+            {guideGestures.map(g => <article key={g.id} className="guide-card"><span className="technique-symbol">{g.symbol}</span><h3>{t(`g.${g.id}.name`)}</h3><span className="pill">{t(`g.${g.id}.action`)}</span><p>{t(`g.${g.id}.instruction`)}</p></article>)}
+          </div>
         </div>
-        <div className="guide-grid">
-          {guideGestures.map(g => <article key={g.id} className="guide-card"><span className="technique-symbol">{g.symbol}</span><h3>{t(`g.${g.id}.name`)}</h3><span className="pill">{t(`g.${g.id}.action`)}</span><p>{t(`g.${g.id}.instruction`)}</p></article>)}
+        {/* The twist lives here, one tap from the session, not on a marketing page. */}
+        <div className="twist">
+          <div className="prose">
+            <h2 className="display">{t('mistake.title')}</h2>
+            <p>{t('mistake.body')}</p>
+            <blockquote>{t('guide.quote')}</blockquote>
+            <p>{t('guide.p2')}</p>
+          </div>
+          <div className="hint-stack">
+            {mistakeExamples.map(h => <div className="hint" key={h.who}><Lightbulb size={18} /><b>{t(`mistake.ex${h.n}.t`)}</b><span>{name(h.who)}. {t(`mistake.ex${h.n}.d`)}</span></div>)}
+          </div>
         </div>
-        <div className="section two-col">
+        <div className="two-col">
           <section className="prose">
             <h2 className="display">{t('guide.h1')}</h2>
             <p>{t('guide.p1')}</p>
-            <blockquote>{t('guide.quote')}</blockquote>
-            <p>{t('guide.p2')}</p>
           </section>
           <section className="prose">
             <h2 className="display">{t('guide.h2')}</h2>
             <p>{t('guide.p3')}</p>
             <p>{t('guide.p4')}</p>
-            <button className="text-button" onClick={() => navigate('progress')}>{t('guide.link')} <ArrowRight size={16} /></button>
+            <button className="text-button" onClick={() => setPage('progress')}>{t('guide.link')} <ArrowRight size={15} /></button>
           </section>
         </div>
-      </>}
+      </div></div>}
 
-      {page === 'progress' && <>
-        <div className="page-heading"><h1 className="display">{t('progress.title')}</h1><p className="lead">{t('progress.lead')}</p></div>
+      {page === 'progress' && <div className="view"><div className="view-inner">
+        <div className="view-head">
+          <span className="label">{t('nav.progress')}</span>
+          <h1 className="display">{t('progress.title')}</h1>
+        </div>
         <div className="stats">
           <article className="stat"><strong>{best}</strong><span>{t('stat.best')}</span></article>
           <article className="stat"><strong>{realProgress.length}</strong><span>{t('stat.count')}</span></article>
@@ -218,23 +201,27 @@ export default function App() {
             {instruments.map(i => <button key={i.id} aria-pressed={boardFilter === i.id} onClick={() => setBoardFilter(i.id)}>{name(i.id)}</button>)}
           </div>
           {board.length
-            ? <ol className="rank-list rank-list-page">{board.map((p, i) => <li className="rank-row" key={p.id}><span className="rank-n">{i + 1}</span><span><b>{nameOf(p.instrument)}</b><small>{t('board.row', { d: new Date(p.date).toLocaleDateString(locales[lang], { day: 'numeric', month: 'long' }), n: p.notes })}</small></span><strong>{p.score}</strong></li>)}</ol>
+            ? <ol className="rank-list rank-list-page">{board.map((p, i) => <li className="rank-row" key={p.id}><span className="rank-n">{String(i + 1).padStart(2, '0')}</span><span><b>{nameOf(p.instrument)}</b><small>{t('board.row', { d: new Date(p.date).toLocaleDateString(locales[lang], { day: 'numeric', month: 'long' }), n: p.notes })}</small></span><strong>{p.score}</strong></li>)}</ol>
             : <p className="muted">{t('board.empty')}</p>}
         </section>
         {progress.length
-          ? <section className="history-list"><h2 className="display" style={{ marginBottom: 16 }}>{t('hist.title')}</h2>
-            {progress.map(p => <div className="history-row" key={p.id}>
+          ? <section className="history-list"><h2 className="display">{t('hist.title')}</h2>
+            <div>{progress.map(p => <div className="history-row" key={p.id}>
               <div><b>{nameOf(p.instrument)}</b><small>{new Date(p.date).toLocaleString(locales[lang], { day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit' })}, {p.demo ? t('hist.demo') : t('hist.camera')}</small></div>
-              <span className="muted">{t('hist.moves', { n: p.notes })}</span>
+              <span>{t('hist.moves', { n: p.notes })}</span>
               <strong>{p.score} <small>{t('hist.points')}</small></strong>
-            </div>)}
+            </div>)}</div>
           </section>
-          : <section className="empty-state"><h2 className="display">{t('empty.title')}</h2><p className="lead">{t('empty.text')}</p><button className="button primary" onClick={() => navigate('collection')}>{t('empty.cta')} <ArrowRight size={17} /></button></section>}
-        <p className="storage-note"><ShieldCheck size={15} /> {t('storage.note')}</p>
-      </>}
+          : <section className="empty-state"><h2 className="display">{t('empty.title')}</h2><p className="lead">{t('empty.text')}</p><button className="button primary" onClick={() => setPage('collection')}>{t('empty.cta')} <ArrowRight size={16} /></button></section>}
+        <p className="storage-note"><ShieldCheck size={14} /> {t('storage.note')}</p>
+      </div></div>}
 
-      {page === 'about' && <>
-        <div className="page-heading"><h1 className="display">{t('about.title')}</h1><p className="lead">{t('about.lead')}</p></div>
+      {page === 'about' && <div className="view"><div className="view-inner">
+        <div className="view-head">
+          <span className="label">{t('nav.about')}</span>
+          <h1 className="display">{t('about.title')}</h1>
+          <p className="lead">{t('about.lead')}</p>
+        </div>
         <div className="two-col">
           <section className="prose">
             <h2 className="display">{t('about.h1')}</h2>
@@ -247,16 +234,14 @@ export default function App() {
             <a className="text-button" href="https://ai.google.dev/edge/mediapipe/solutions/vision/hand_landmarker/web_js" target="_blank" rel="noreferrer">{t('about.link')} <ExternalLink size={14} /></a>
           </section>
         </div>
-      </>}
-
-      <footer className="page-footer"><span>© {new Date().getFullYear()} MURA</span><span>{t('footer.tag')}</span></footer>
+      </div></div>}
     </main>
 
     {(session || qr) && <div ref={dialogRef}>
       {session && <Session key={session.id} instrument={session} close={() => { setSession(null); if (location.search) history.replaceState(null, '', location.pathname); }} onComplete={() => setProgress(getProgress())} sound={sound} toggleSound={() => updateSound(s => !s)} />}
       {qr && <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setQr(null); }}>
         <section className="qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-title">
-          <div className="modal-header"><span className="muted">{t('qrm.label')}</span><button className="icon-button" aria-label={t('qrm.close')} onClick={() => setQr(null)}><X size={20} /></button></div>
+          <div className="modal-header"><span className="label">{t('qrm.label')}</span><button className="icon-button" aria-label={t('qrm.close')} onClick={() => setQr(null)}><X size={18} /></button></div>
           <h2 id="qr-title">{t('qrm.title', { name: name(qr.id) })}</h2>
           <div className="qr-image">{qrImage ? <img src={qrImage} alt={t('qrm.alt', { name: name(qr.id) })} /> : <p>{qrError ? t(qrError) : t('qrm.creating')}</p>}</div>
           {['localhost', '127.0.0.1'].includes(location.hostname) && <p className="qr-local-note">{t('qrm.local')}</p>}

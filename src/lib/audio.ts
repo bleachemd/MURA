@@ -3,7 +3,16 @@ let context: AudioContext | undefined;
 let enabled = true;
 let bow: { gain: GainNode; oscillator: OscillatorNode; filter: BiquadFilterNode } | undefined;
 export function setSound(value: boolean) { enabled=value;if(!value)stopBow(); }
-export async function unlockAudio() { context ??= new AudioContext();if(context.state==='suspended')await context.resume(); }
+/**
+ * Sound is optional and must never gate the camera or the demo. Firefox leaves resume()
+ * pending for as long as its autoplay policy still blocks the page, and a blocked or
+ * unsupported AudioContext throws on construction; both would otherwise hang the caller.
+ */
+export function unlockAudio(): Promise<void> {
+  try { context ??= new AudioContext(); } catch { return Promise.resolve(); }
+  if(context.state!=='suspended')return Promise.resolve();
+  return Promise.race([context.resume().catch(()=>{}), new Promise<void>(resolve=>{ setTimeout(resolve,400); })]);
+}
 export function stopBow() {
   if(!bow || !context)return;
   const old=bow;bow=undefined;old.gain.gain.cancelScheduledValues(context.currentTime);old.gain.gain.setTargetAtTime(.0001,context.currentTime,.035);old.oscillator.stop(context.currentTime+.2);

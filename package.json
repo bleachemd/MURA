@@ -7,12 +7,12 @@
     "dev": "vite --host 0.0.0.0",
     "build": "tsc -b && vite build",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "tsx --test src/lib/gestures.test.ts",
+    "test": "tsx --test src/lib/gestures.test.ts src/lib/audio.test.ts",
     "test:e2e": "node scripts/check-ui.mjs"
   },
   "dependencies": {
     "@fontsource-variable/onest": "^5.3.1",
-    "@fontsource/cormorant": "^5.3.0",
+    "@fontsource-variable/unbounded": "^5.3.0",
     "@mediapipe/tasks-vision": "0.10.32",
     "lucide-react": "^0.468.0",
     "qrcode": "^1.5.4",

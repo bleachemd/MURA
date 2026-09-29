@@ -114,7 +114,7 @@ MediaPipe находит 21 точку кисти. **Собственные вр
 
 ## Технологии и проверка
 
-React 19, TypeScript, Vite, MediaPipe Tasks Vision 0.10.32, Web Audio API, QRCode и Lucide. Шрифты Cormorant и Onest подключены пакетами Fontsource и раздаются вместе с сайтом, поэтому работают без интернета и внешних запросов; кириллица и казахские буквы включены.
+React 19, TypeScript, Vite, MediaPipe Tasks Vision 0.10.32, Web Audio API, QRCode и Lucide. Шрифты Unbounded и Onest подключены пакетами Fontsource и раздаются вместе с сайтом, поэтому работают без интернета и внешних запросов; кириллица и казахские буквы включены.
 
 ```sh
 npm test       # тесты траекторий, ошибок, двойных ударов и защиты от ложных нот

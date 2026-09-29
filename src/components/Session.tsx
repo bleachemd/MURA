@@ -113,7 +113,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
     const draw=(points:Point[],valid:boolean)=>{
       const c=canvas.current;const v=video.current;if(!c||!v)return;
       if(c.width!==(v.videoWidth||640))c.width=v.videoWidth||640;if(c.height!==(v.videoHeight||480))c.height=v.videoHeight||480;const ctx=c.getContext('2d');if(!ctx)return;
-      ctx.clearRect(0,0,c.width,c.height);ctx.strokeStyle=valid?'#4fcbc1':'#e6ac3c';ctx.fillStyle=valid?'#b8f3ee':'#ffd98f';ctx.lineWidth=2;
+      ctx.clearRect(0,0,c.width,c.height);ctx.strokeStyle=valid?'#5cc0a8':'#e7b443';ctx.fillStyle=valid?'#9fe0ce':'#f2d391';ctx.lineWidth=2;
       if(!liteRef.current)for(const [a,b]of connections){if(!points[a]||!points[b])continue;ctx.beginPath();ctx.moveTo(points[a].x*c.width,points[a].y*c.height);ctx.lineTo(points[b].x*c.width,points[b].y*c.height);ctx.stroke();}
       for(const p of points){if(!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;ctx.beginPath();ctx.arc(p.x*c.width,p.y*c.height,3,0,Math.PI*2);ctx.fill();}
     };
@@ -205,7 +205,8 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
     document.addEventListener('visibilitychange',onVisibility);void init();
     return()=>{cancelled=true;if(videoCallback)video.current?.cancelVideoFrameCallback(frame);else cancelAnimationFrame(frame);stream?.getTracks().forEach(t=>t.stop());model?.close();stopBow();document.removeEventListener('visibilitychange',onVisibility);};
   },[mode,instrument.id]);
-  async function start(demo=false){await unlockAudio().catch(()=>{});setError('');setMode(demo?'demo':'live');if(demo){setLoading(false);reset();}}
+  /** Audio unlocks in the background: waiting for it must never delay the camera or the demo. */
+  function start(demo=false){void unlockAudio();setError('');setMode(demo?'demo':'live');if(demo){setLoading(false);reset();}}
   const expected=gestures.find(g=>g.id===melody[index]);
   const status=mode==='demo'?t('s.st.demo'):trackingPaused?t('s.st.paused'):handPresent?t('s.st.hand'):t('s.st.search');
   const CoachIcon=guidance.tone==='success'?Check:guidance.tone==='warning'?CircleAlert:Lightbulb;
@@ -213,13 +214,13 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
   const hint=localizeHint(lang,guidance,{instrument:instrument.id,nextId:melody[index]});
   const gname=(id?:string)=>id?t(`g.${id}.name`):'';
   const feel=t(`s.feel.${instrument.id}`).split('|');
-  return <div className={`session-sheet ${lite?'lite':''}`} role="dialog" aria-modal="true" aria-labelledby="session-title"><div className="session-inner">
+  return <div className={`session-sheet on-dark ${lite?'lite':''}`} role="dialog" aria-modal="true" aria-labelledby="session-title"><div className="session-inner">
     <div className="session-top">
       <div className="session-title"><h2 id="session-title">{t(`inst.${instrument.id}.name`)}<span> / {t(`inst.${instrument.id}.alt`)}</span></h2>{mode&&<span className="pill">{mode==='demo'?t('s.pill.demo'):t('s.pill.live')}</span>}</div>
       <div className="session-tools"><button className="icon-button sound-button" aria-pressed={sound} onClick={toggleSound} aria-label={sound?t('sound.off'):t('sound.on')}>{sound?<Volume2 size={19}/>:<VolumeX size={19}/>}</button><button className="icon-button" onClick={close} aria-label={t('s.close')}><X size={20}/></button></div>
     </div>
     {!mode?<div className="session-intro">
-      <div className={`intro-art ${instrument.color}`}><InstrumentArt type={instrument.id}/></div>
+      <div className="intro-art"><InstrumentArt type={instrument.id}/></div>
       <div className="intro-content">
         <h3>{feel[0]}<br/>{feel[1]}</h3>
         <p className="lead">{t(`setup.${instrument.id}`)}</p>

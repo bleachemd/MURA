@@ -10,9 +10,6 @@ export const en: Record<string, string> = {
   'sound.off': 'Turn sound off',
   'lang.aria': 'Language',
 
-  'hero.title': 'Music in your hands.',
-  'hero.lead': 'Stand in front of your camera and play Kazakh instruments with gestures. Nothing to install.',
-  'hero.cta': 'Start playing',
   'hero.privacy': 'Video stays on your device',
   'card.play': 'Play',
   'card.listen': 'Listen: {name}',
@@ -21,13 +18,6 @@ export const en: Record<string, string> = {
   'card.listenTitle': 'Hear the sound',
   'card.listenOff': 'Turn the sound on first',
 
-  'steps.title': 'From gesture to melody',
-  'steps.1.t': 'Pick an instrument',
-  'steps.1.d': 'Dombyra, kobyz or dauylpaz. Each has its own set of movements.',
-  'steps.2.t': 'Turn on the camera',
-  'steps.2.d': 'Show your hand and hold it on the marker for a second. The app adapts to your hand.',
-  'steps.3.t': 'Play with your hands',
-  'steps.3.d': 'Nine moves in forty-five seconds. You get a score and a record at the end.',
 
   'mistake.title': 'Slipped up? We’ll tell you what to fix',
   'mistake.body': 'The app doesn’t just say “not recognized”. It sees where your hand is and where it is going, and names one concrete thing to change. The tip appears on screen, and a marker shows where to move.',
@@ -38,11 +28,8 @@ export const en: Record<string, string> = {
   'mistake.ex2.d': 'Keep your hand at one height and move sideways along the track.',
   'mistake.ex3.t': 'You need the rim now',
   'mistake.ex3.d': 'Move your hand to the side marker, then strike down.',
-  'qr.banner': 'Saw it in the museum? Bring it to life on your phone.',
-  'qr.try': 'Try the QR',
-  'footer.tag': 'Tradition meets technology',
 
-  'guide.title': 'Let your hands speak.',
+  'guide.title': 'Techniques and the error mode',
   'guide.lead': 'Not arbitrary signs but the real movements that make the sound. Show the camera one playing hand, fully in frame.',
   'guide.tabs': 'Instrument moves',
   'guide.h1': 'Mistakes are part of music',
@@ -54,7 +41,7 @@ export const en: Record<string, string> = {
   'guide.p4': 'Records are stored on this device. To play again without a button, take your hand out of frame, then show it and hold it on the marker.',
   'guide.link': 'To my achievements',
 
-  'progress.title': 'Your musical story.',
+  'progress.title': 'Results and records',
   'progress.lead': 'Small discoveries that stay with you.',
   'stat.best': 'Personal best',
   'stat.count': 'Camera performances',
@@ -74,7 +61,7 @@ export const en: Record<string, string> = {
   'empty.cta': 'Choose an instrument',
   'storage.note': 'Results are stored only in this browser. Demo runs don’t count toward records.',
 
-  'about.title': 'The past sounds new.',
+  'about.title': 'What this is, and how it works',
   'about.lead': 'MURA (мұра, “heritage”) is an interactive learning museum of Kazakh instruments. Scan the QR code by an exhibit, make a gesture, and hear the sound.',
   'about.h1': 'Three instruments, three characters',
   'about.h2': 'How the music comes alive',
@@ -95,11 +82,11 @@ export const en: Record<string, string> = {
   'qrm.copyErr': 'Couldn’t copy. Select the link below by hand.',
   'qrm.url': 'Link to the instrument',
 
-  'inst.dombyra.name': 'Dombyra', 'inst.dombyra.alt': 'Домбыра', 'inst.dombyra.sub': 'Two strings. A thousand stories.',
+  'inst.dombyra.name': 'Dombyra', 'inst.dombyra.alt': 'Домбыра', 'inst.dombyra.sub': 'Plucked string · two strings',
   'inst.dombyra.desc': 'The familiar plucked sound and the voice of the Kazakh steppe. Start getting to know music with two strings.',
-  'inst.kobyz.name': 'Kobyz', 'inst.kobyz.alt': 'Қобыз', 'inst.kobyz.sub': 'A voice that links the ages.',
+  'inst.kobyz.name': 'Kobyz', 'inst.kobyz.alt': 'Қобыз', 'inst.kobyz.sub': 'Bowed string · horsehair',
   'inst.kobyz.desc': 'A bowed instrument with a deep, drawn-out sound. Discover its unusual timbre.',
-  'inst.dauylpaz.name': 'Dauylpaz', 'inst.dauylpaz.alt': 'Дауылпаз', 'inst.dauylpaz.sub': 'Feel the rhythm of the steppe.',
+  'inst.dauylpaz.name': 'Dauylpaz', 'inst.dauylpaz.alt': 'Дауылпаз', 'inst.dauylpaz.sub': 'Membranophone · hide head',
   'inst.dauylpaz.desc': 'A traditional drum with a powerful, full sound. Make your own rhythm with one hand movement.',
   'noun.dombyra': 'strings', 'noun.kobyz': 'bow track', 'noun.dauylpaz': 'drum',
 
