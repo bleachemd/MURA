@@ -76,3 +76,128 @@
   .page-content{padding-left:max(19px,env(safe-area-inset-left));padding-right:max(19px,env(safe-area-inset-right))}
 }
 .sky{background:#e3eaea}.motion-stage .camera-viewport video.unmirrored{transform:none}.gesture-controls:has(>:nth-child(4)){grid-template-columns:repeat(4,1fr)}
+
+/* Переключатель языка: своих стилей у него не было, и он рисовался системными кнопками. */
+.lang-switch{display:flex;gap:2px;padding:3px;background:#eff1e9;border-radius:6px}
+.lang-switch button{background:none;color:#8a9383;font-size:10px;font-weight:600;letter-spacing:.5px;padding:6px 8px;border-radius:4px}
+.lang-switch button[aria-pressed="true"]{background:#fff;color:#3d5a33;box-shadow:0 1px 4px #2137190f}
+.nav-backdrop{display:none}
+
+/* Телефон — основной способ играть. Экран выступления целиком помещается в высоту:
+   с рукой перед камерой страницу не прокрутить, поэтому камера забирает всё свободное
+   место, а подсказка и следующий приём стоят под ней. Текст не мельче 11px, кнопки от 44px. */
+@media(max-width:760px){
+  .nav-backdrop{display:block;position:fixed;inset:0;z-index:29;background:#12291f59;animation:session-in .2s ease}
+  nav button{font-size:15px;padding:15px 14px}
+  .icon-button{width:44px;height:44px}
+  .sound-button{padding:10px}
+  .breadcrumb{font-size:13px}
+  .lang-switch button{font-size:12px;padding:8px 9px}
+  .eyebrow{font-size:10px;letter-spacing:1.5px}
+
+  .session-top{padding-bottom:8px;gap:8px}
+  .session-title{margin:0;min-width:0}
+  .session-title h2{font-size:21px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .session-title h2 span{display:inline;margin-left:4px;font-size:14px}
+  .session-title .pill{display:none}
+  .session-tools{gap:0}
+
+  /* Вступление: кнопка камеры прилипает к низу экрана, под большой палец.
+     overflow:clip вместо hidden — иначе карточка становится контейнером прокрутки и sticky не работает. */
+  .session-intro{overflow:clip}
+  .intro-content h3{font-size:26px}
+  .intro-content>p{font-size:14px;line-height:1.6}
+  .intro-gestures b{font-size:15px}
+  .intro-gestures small{font-size:12px}
+  .intro-content .intro-challenge{font-size:12px}
+  .intro-content .privacy-note{font-size:12px;line-height:1.5}
+  .intro-cta{position:sticky;bottom:0;z-index:2;flex-direction:column;align-items:stretch;gap:0;margin:0 -23px;padding:18px 23px max(8px,env(safe-area-inset-bottom));background:linear-gradient(#fff0,#fff 18px)}
+  .intro-cta .button{min-height:52px;font-size:16px}
+  .intro-cta .text-button{font-size:14px;min-height:44px}
+
+  .session-inner:has(>.session-play:not(.done)){height:100%;min-height:0;gap:8px}
+  .session-play:not(.done){flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
+  .session-play:not(.done) .session-main{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px}
+  .session-play:not(.done) .motion-stage{flex:1 1 0;height:auto;min-height:180px;max-height:none;aspect-ratio:auto!important}
+  .session-play.done .motion-stage{min-height:380px}
+  .session-footer,.motion-instruction{display:none}
+  .session-play.live .gesture-controls{display:none}
+  .session-side{position:static;gap:8px}
+  .session-bar{flex-wrap:nowrap}
+  .session-stats{gap:12px;padding:0 2px;min-width:0}
+  .session-stats>span{font-size:13px;white-space:nowrap}
+  .session-stats b{font-size:17px}
+  .ar-toggle{width:44px;height:44px;padding:0;justify-content:center;flex-shrink:0;border-radius:50%}
+  .ar-toggle span{display:none}
+  .lite-note{font-size:12px;padding:8px 12px}
+  .camera-status{font-size:11px;letter-spacing:.3px;padding:7px 11px}
+  .motion-ready-label b{font-size:14px}
+  .motion-ready-label span{font-size:12px}
+  .demo-ready p{font-size:13px}
+  .stage-overlay h3{font-size:20px}
+  .stage-overlay p{font-size:14px;line-height:1.6}
+  /* Высота подсказки постоянная: иначе от длины текста прыгала бы высота камеры. */
+  .coach-feedback{height:86px;min-height:0;margin:0;padding:12px 14px;gap:12px;overflow:hidden}
+  .coach-kind,.coach-text small{display:none}
+  .coach-text{gap:3px}
+  .coach-feedback b{font-size:15px;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .coach-text>span:not(.coach-kind){font-size:13px;line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .session-side .next-gesture{padding:8px 12px;gap:12px}
+  .next-gesture>span:first-child{font-size:26px}
+  .next-gesture small{font-size:11px;letter-spacing:.3px;margin-bottom:2px}
+  .next-gesture strong{font-size:15px}
+  .melody-track{margin:0;gap:6px}
+  .melody-track>span{width:24px;height:24px;font-size:13px}
+  .gesture-controls{margin:0;gap:8px}
+  .gesture-control{padding:10px 6px}
+  .gesture-control .technique-symbol{font-size:24px}
+  .gesture-control b{font-size:12px}
+  .gesture-control small{display:none}
+
+  .result-overlay h3{font-size:20px}
+  .result-score{font-size:40px}
+  .result-overlay small{font-size:12px;line-height:1.5}
+  .result-overlay .button{font-size:15px;min-height:48px;padding:10px 22px}
+  .summary-title{font-size:18px}
+  .summary-stats b{font-size:20px}
+  .summary-stats span{font-size:10px;letter-spacing:.8px}
+  .summary-block h4{font-size:11px;letter-spacing:1.2px}
+  .summary-clean,.hint b,.weak-list li,.rank-row{font-size:14px}
+  .hint span{font-size:13px;line-height:1.5}
+  .rank-row small{font-size:11px}
+  .rank-row strong{font-size:16px}
+}
+@media(max-width:520px){
+  .page-heading p{font-size:14px;line-height:1.6;max-width:none}
+  .hero p{font-size:14px;line-height:1.6}
+  .hero .button{font-size:15px}
+  .hero-badge{font-size:9px}
+  .hero-footnote{font-size:11px;white-space:normal}
+  .hero-art-label,.sound-wave{display:none}
+  .section-heading h2{font-size:24px}
+  .section-heading p{font-size:13px}
+  .filters button{font-size:13px;padding:11px 6px}
+  /* Все четыре инструмента — на одном экране, а не по экрану на каждый. */
+  .instrument-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+  .card-art{height:150px}
+  .card-watermark,.instrument-number,.category-label,.instrument-tag,.instrument-heading>span{display:none}
+  .art-top{justify-content:flex-end;top:8px;right:8px}
+  .qr-button{width:36px;height:36px}
+  .listen-button{width:40px;height:40px;right:8px;bottom:8px}
+  .card-content{padding:12px}
+  .instrument-heading h3{font-size:19px}
+  .card-content>p{font-size:12px;line-height:1.45;margin-top:4px}
+  .card-bottom{margin-top:10px;padding-top:0;border:0}
+  .play-instrument{width:100%;justify-content:center;min-height:44px;font-size:14px;gap:8px}
+  .museum-banner h3{font-size:17px}
+  .museum-banner p{font-size:13px;line-height:1.6}
+  .banner-link{font-size:14px}
+  .trust-row>span{font-size:13px}
+  .page-footer{font-size:11px}
+  .guide-card p,.content-panel p,.guide-banner p,.about-hero p{font-size:14px;line-height:1.7}
+  .guide-instrument-picker button{font-size:13px}
+  .guide-ar-note{font-size:13px}
+  .progress-stats article>span:last-child{font-size:11px}
+  .storage-note{font-size:12px}
+  .history-row small{font-size:11px}
+}
