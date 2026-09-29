@@ -1,20 +1,26 @@
 import {CoachLatch,coach} from './coaching';
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {calibrateHand,getMelody,getProfile,handQuality,selectHand,MotionRecognizer,type Gesture,type Point} from './gestures';
+import {calibrateHand,getMelody,getProfile,palmPoint as palmCenter,handQuality,selectHand,MotionRecognizer,type Gesture,type Point} from './gestures';
 function hand(x:number,y:number,pinch=false):Point[]{
   const p=Array.from({length:21},()=>({x,y,z:0}));p[0]={x,y:y+.12,z:0};
   p[4]={x:x-.025,y:y-.04,z:0};p[8]={x:x+(pinch?-.01:.095),y:y-(pinch?.04:.10),z:0};
   return p;
 }
+/** A hand lying on a table, fingers pointing up the image; a lifted finger looks shorter to the camera. */
+function tableHand(x:number,y:number,lifted=-1):Point[]{
+  const p=Array.from({length:21},()=>({x,y,z:0}));p[0]={x,y:y+.15,z:0};
+  [5,9,13,17].forEach((b,i)=>{p[b]={x:x-.045+i*.03,y,z:0};p[b+3]={x:x-.045+i*.03,y:y-(i===lifted?.04:.09),z:0};});
+  return p;
+}
 function feed(detector:MotionRecognizer,positions:[number,number][],step=80,start=0){return positions.flatMap(([x,y],i)=>{const r=detector.update(hand(x,y),start+i*step);return r.event?[r.event.gesture]:[];});}
 const down:[number,number][]=[[.65,.46],[.65,.50],[.65,.54],[.65,.59],[.65,.65],[.65,.71]];
 const drum:[number,number][]=[[.5,.42],[.5,.49],[.5,.56],[.5,.63]];
-test('every instrument has its own three techniques and nine-note scenario',()=>{
-  for(const id of ['dombyra','kobyz','dauylpaz']){const ids=getProfile(id).gestures.map(g=>g.id);assert.equal(new Set(ids).size,3);assert.equal(getMelody(id).length,9);assert.ok(getMelody(id).every(g=>ids.includes(g)));}
+test('every instrument has its own techniques and nine-note scenario',()=>{
+  for(const id of ['dombyra','kobyz','dauylpaz','zhetygen']){const ids=getProfile(id).gestures.map(g=>g.id);assert.equal(new Set(ids).size,ids.length);assert.equal(getProfile(id).id,id);assert.equal(getMelody(id).length,9);assert.ok(getMelody(id).every(g=>ids.includes(g)));}
 });
 test('no stationary hand or held pinch produces notes',()=>{
-  for(const id of ['dombyra','kobyz','dauylpaz'])for(const pinch of [false,true]){const d=new MotionRecognizer(id);for(let t=0;t<3000;t+=80)assert.equal(d.update(hand(.5,.6,pinch),t).event,null);}
+  for(const id of ['dombyra','kobyz','dauylpaz','zhetygen'])for(const pinch of [false,true]){const d=new MotionRecognizer(id);for(let t=0;t<3000;t+=80)assert.equal(d.update(hand(.5,.6,pinch),t).event,null);}
 });
 test('dombra downstroke and immediate reverse upstroke',()=>{
   const d=new MotionRecognizer('dombyra');assert.deepEqual(feed(d,down),['strum-down']);
@@ -139,7 +145,7 @@ test('drum hits and strums are stable across sample rates and movement durations
   }
 });
 test('seeded small camera noise does not generate notes or bow audio',()=>{
-  for(const id of ['dombyra','kobyz','dauylpaz']){
+  for(const id of ['dombyra','kobyz','dauylpaz','zhetygen']){
     const d=new MotionRecognizer(id);let seed=42;
     for(let t=0;t<5000;t+=33){seed=(seed*1664525+1013904223)>>>0;const x=.65+((seed/2**32)-.5)*.006;seed=(seed*1664525+1013904223)>>>0;const y=.6+((seed/2**32)-.5)*.006;const r=d.update(hand(x,y),t);assert.equal(r.events.length,0);assert.equal(r.impacts.length,0);assert.equal(r.bowSpeed,0);}
   }
@@ -159,4 +165,21 @@ test('a warning stays readable, and success replaces it immediately',()=>{
   const l=new CoachLatch();const warning=coach('w','Выше','Подними руку',undefined,'warning');const guide=coach('g','Играй','Проведи вниз');
   assert.equal(l.update(warning,0).code,'w');assert.equal(l.update(guide,200).code,'w');assert.equal(l.update(guide,1100).code,'g');
   assert.equal(l.update(coach('ok','Получилось','Следующий приём',undefined,'success'),1150).code,'ok');
+});
+test('zhetygen: lifting a finger and touching the table plays the string under that fingertip',()=>{
+  const d=new MotionRecognizer('zhetygen');const taps=(x:number,finger:number,start:number)=>[tableHand(x,.6),tableHand(x,.6,finger),tableHand(x,.6,finger),tableHand(x,.6)].flatMap((h,i)=>d.update(h,start+i*50).events.map(e=>e.gesture));
+  assert.deepEqual(taps(.545,0,0),['string-4']);
+  assert.deepEqual(taps(.545,3,200),['string-6']);
+  const off=new MotionRecognizer('zhetygen');[tableHand(.17,.6),tableHand(.17,.6,0)].forEach((h,i)=>off.update(h,i*50));const r=off.update(tableHand(.17,.6),100);
+  assert.deepEqual(r.events,[]);assert.equal(r.coach.code,'tap-off-strings');
+});
+test('zhetygen: sliding or turning a resting hand plays nothing',()=>{
+  const d=new MotionRecognizer('zhetygen');
+  for(let i=0;i<24;i++){const h=tableHand(.25+i*.022,.6),a=i*.03,c=palmCenter(h);assert.deepEqual(d.update(h.map(p=>({x:c.x+(p.x-c.x)*Math.cos(a)-(p.y-c.y)*Math.sin(a),y:c.y+(p.x-c.x)*Math.sin(a)+(p.y-c.y)*Math.cos(a),z:0})),i*50).events,[]);}
+});
+test('zhetygen: a finger kept raised becomes its new resting pose instead of a stuck lift',()=>{
+  const d=new MotionRecognizer('zhetygen');d.update(tableHand(.545,.6),0);
+  for(let t=50;t<=1700;t+=50)d.update(tableHand(.545,.6,1),t);
+  assert.deepEqual(d.update(tableHand(.545,.6,1),1750).events,[]);
+  d.update(tableHand(.545,.6),1800);assert.deepEqual(d.update(tableHand(.545,.6,1),1850).events,[]);
 });
