@@ -18,7 +18,7 @@
   --kok: #4fcbc1;
   --ember: #f0805a;
   --serif: 'Cormorant', 'Times New Roman', serif;
-  --sans: 'Onest', system-ui, sans-serif;
+  --sans: 'Onest Variable', system-ui, sans-serif;
   --ease: cubic-bezier(.23, 1, .32, 1);
   --ease-move: cubic-bezier(.77, 0, .175, 1);
   --radius: 14px;
@@ -272,7 +272,7 @@ h3.display { font-size: clamp(1.6rem, 2.6vw, 2.1rem); line-height: 1.08; }
 .live-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--kok); }
 .live-dot.muted { background: var(--gold); }
 
-.stage-overlay { position: absolute; inset: 0; z-index: 6; display: grid; place-content: center; justify-items: center; gap: 12px; padding: 24px; text-align: center; background: rgb(11 22 32 / .92); animation: fade-in 220ms var(--ease); }
+.stage-overlay { position: absolute; inset: 0; z-index: 6; display: grid; place-content: center; justify-items: center; gap: 12px; padding: 24px; text-align: center; background: rgb(11 22 32 / .96); animation: fade-in 220ms var(--ease); }
 .stage-overlay h3 { font-family: var(--serif); font-size: 2rem; font-weight: 600; line-height: 1.05; }
 .stage-overlay p { color: var(--bone-dim); max-width: 32ch; }
 .stage-overlay small { color: var(--bone-faint); max-width: 40ch; }
@@ -333,6 +333,42 @@ h3.display { font-size: clamp(1.6rem, 2.6vw, 2.1rem); line-height: 1.08; }
 .session-footer { display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; color: var(--bone-faint); font-size: .82rem; }
 .session-footer span { display: inline-flex; align-items: center; gap: 6px; }
 
+/* ── Feedback: flashes, streak, score pops ─────────────── */
+.session-tools { margin-left: auto; display: flex; gap: 8px; }
+.session-top .icon-button { margin-left: 0; }
+.camera-stage::before { content: ''; position: absolute; inset: 0; border-radius: inherit; box-shadow: inset 0 0 0 3px var(--ember), inset 0 0 60px rgb(240 128 90 / .35); opacity: 0; pointer-events: none; z-index: 4; transition: opacity 400ms var(--ease); }
+.camera-stage.note-miss::before { opacity: 1; transition-duration: 0ms; }
+.streak { color: var(--kok) !important; font-weight: 600; animation: streak-pop 220ms var(--ease) both; }
+@keyframes streak-pop { from { opacity: 0; transform: scale(.85); } }
+.score-pop { position: absolute; z-index: 3; transform: translate(-50%, -50%); font-family: var(--serif); font-size: 2rem; font-weight: 700; color: var(--kok); text-shadow: 0 2px 12px rgb(0 0 0 / .6); pointer-events: none; animation: score-rise 800ms var(--ease) both; }
+@keyframes score-rise { from { opacity: 0; transform: translate(-50%, -30%) scale(.8); } 20% { opacity: 1; } to { opacity: 0; transform: translate(-50%, -160%) scale(1); } }
+
+/* ── Post-performance review ───────────────────────────── */
+.summary { display: grid; gap: 16px; padding: 22px; border-radius: 22px; background: var(--felt); border: 1px solid var(--line); animation: coach-in 260ms var(--ease) both; }
+.summary-title { font-family: var(--serif); font-size: 2rem; font-weight: 600; line-height: 1; }
+.summary-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.summary-stats div { display: grid; gap: 2px; padding: 12px; border-radius: 14px; background: var(--felt-2); }
+.summary-stats b { font-family: var(--serif); font-size: 1.7rem; font-weight: 600; line-height: 1; font-variant-numeric: lining-nums; }
+.summary-stats span { color: var(--bone-dim); font-size: .78rem; }
+.summary-block { display: grid; gap: 8px; }
+.summary-block h4 { margin: 0; font-size: .9rem; font-weight: 600; color: var(--bone-dim); }
+.summary-clean { color: var(--kok); }
+.weak-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.weak-list li { display: flex; justify-content: space-between; padding: 10px 14px; border-radius: 12px; background: var(--felt-2); }
+
+/* ── Leaderboard ───────────────────────────────────────── */
+.leaderboard { margin-bottom: 48px; display: grid; gap: 20px; }
+.leaderboard .tabs { margin-bottom: 0; justify-self: start; max-width: 100%; overflow-x: auto; }
+.rank-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.rank-row { display: grid; grid-template-columns: 32px 1fr auto; gap: 12px; align-items: center; padding: 10px 14px; border-radius: 12px; background: var(--felt-2); }
+.rank-row small { display: block; color: var(--bone-faint); font-size: .8rem; }
+.rank-row strong { font-family: var(--serif); font-size: 1.5rem; font-weight: 600; font-variant-numeric: lining-nums; }
+.rank-row.is-current { box-shadow: inset 0 0 0 1px var(--gold); background: rgb(230 172 60 / .1); }
+.rank-n, .history-row strong { font-variant-numeric: lining-nums; }
+.rank-n { font-family: var(--serif); font-size: 1.4rem; color: var(--gold); font-weight: 600; }
+.rank-list-page .rank-row { padding: 16px 20px; border-radius: 16px; background: var(--felt); border: 1px solid var(--line); }
+.rank-list-page .rank-row:first-child .rank-n { font-size: 2rem; }
+
 /* ── Responsive ───────────────────────────────────────── */
 @media (max-width: 1000px) {
   .session-play { grid-template-columns: 1fr; }
@@ -382,8 +418,10 @@ h3.display { font-size: clamp(1.6rem, 2.6vw, 2.1rem); line-height: 1.08; }
 /* Reduced motion keeps opacity/colour changes, drops movement */
 @media (prefers-reduced-motion: reduce) {
   html { scroll-behavior: auto; }
-  .arch, .session-sheet, .qr-modal, .coach-text, .trophy-circle { animation-name: fade-in; animation-duration: 160ms; transform: none; }
+  .arch, .session-sheet, .qr-modal, .coach-text, .trophy-circle, .summary, .streak { animation-name: fade-in; animation-duration: 160ms; transform: none; }
   .ar-ripple { animation: none; }
+  .score-pop { animation-name: score-fade; animation-duration: 800ms; }
+  @keyframes score-fade { from { opacity: 0; } 20% { opacity: 1; } to { opacity: 0; } }
   .arch:hover .instrument-art { transform: none; }
   .button:active, .icon-button:active, .gesture-control:active { transform: none; }
 }

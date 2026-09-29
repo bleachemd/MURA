@@ -1,5 +1,18 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import '@fontsource-variable/onest';
+import '@fontsource/cormorant/latin-500.css';
+import '@fontsource/cormorant/latin-600.css';
+import '@fontsource/cormorant/latin-700.css';
+import '@fontsource/cormorant/latin-500-italic.css';
+import '@fontsource/cormorant/cyrillic-500.css';
+import '@fontsource/cormorant/cyrillic-600.css';
+import '@fontsource/cormorant/cyrillic-700.css';
+import '@fontsource/cormorant/cyrillic-500-italic.css';
+import '@fontsource/cormorant/cyrillic-ext-500.css';
+import '@fontsource/cormorant/cyrillic-ext-600.css';
+import '@fontsource/cormorant/cyrillic-ext-700.css';
+import '@fontsource/cormorant/cyrillic-ext-500-italic.css';
 import './styles.css';
 ReactDOM.createRoot(document.getElementById('root')!).render(<React.StrictMode><App /></React.StrictMode>);

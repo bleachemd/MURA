@@ -44,3 +44,20 @@ export function playNote(gesture: Gesture, instrument = 'dombyra', strength=.7) 
   } else if(gesture==='pluck')pluck(293.66,0,1);
   else {const notes=gesture==='strum-up'?[220,146.83]:[146.83,220];pluck(notes[0],0,.8);pluck(notes[1],.022,.8);}
 }
+export type Cue = 'good' | 'miss' | 'start' | 'finish' | 'record';
+/** Tiny synthesized interface sounds: a bright ping, a soft low drop, a rising start, a finish arpeggio. */
+export function playCue(kind: Cue) {
+  if(!enabled || !context || context.state!=='running')return;
+  const ctx=context;const t0=ctx.currentTime;
+  const tone=(frequency:number,at:number,length:number,level:number,type:OscillatorType='sine',slideTo?:number)=>{
+    const osc=ctx.createOscillator();osc.type=type;osc.frequency.setValueAtTime(frequency,t0+at);
+    if(slideTo)osc.frequency.exponentialRampToValueAtTime(slideTo,t0+at+length);
+    const gain=ctx.createGain();gain.gain.setValueAtTime(.0001,t0+at);gain.gain.exponentialRampToValueAtTime(level,t0+at+.012);gain.gain.exponentialRampToValueAtTime(.0001,t0+at+length);
+    osc.connect(gain);gain.connect(ctx.destination);osc.start(t0+at);osc.stop(t0+at+length+.02);osc.onended=()=>{osc.disconnect();gain.disconnect();};
+  };
+  if(kind==='good'){tone(1174.66,0,.16,.035);tone(1567.98,.045,.2,.03);}
+  else if(kind==='miss')tone(180,0,.22,.05,'triangle',110);
+  else if(kind==='start'){tone(392,0,.14,.05);tone(587.33,.11,.22,.05);}
+  else if(kind==='finish'){[392,493.88,587.33,783.99].forEach((f,i)=>tone(f,i*.11,.32,.05));}
+  else [392,587.33,783.99,987.77,1174.66].forEach((f,i)=>tone(f,i*.1,.4,.055));
+}

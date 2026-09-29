@@ -115,6 +115,9 @@ async function upstroke(){for(const y of [.71,.67,.62,.56,.50])await move(.65,y)
 await pluck();await downstroke();await pluck();await upstroke();await downstroke();await upstroke();await pluck();
 await motion.getByText('Твоё выступление завершено',{exact:true}).waitFor();
 if(!(await motion.locator('.result-score').innerText()).startsWith('900'))throw Error('hands-free full performance failed');
+await motion.getByText('Новый рекорд',{exact:true}).waitFor();
+if(!(await motion.locator('.summary').innerText()).includes('100%'))throw Error('summary accuracy failed');
+await motion.screenshot({path:'artifacts/summary.png'});
 await motion.evaluate(()=>{window.__landmarks=null;});await motion.waitForTimeout(2800);
 await move(.65,.43);
 await motion.getByText('Совмести точку на кисти с меткой',{exact:true}).waitFor();

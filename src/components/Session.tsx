@@ -1,16 +1,20 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, Check, CircleAlert, Eye, EyeOff, Lightbulb, LoaderCircle, Maximize, RotateCcw, ShieldCheck, Trophy, X } from 'lucide-react';
+import { Camera, Check, CircleAlert, Eye, EyeOff, Lightbulb, LoaderCircle, Maximize, RotateCcw, ShieldCheck, Trophy, Volume2, VolumeX, X } from 'lucide-react';
 import type { HandLandmarker } from '@mediapipe/tasks-vision';
 import { distance, getMelody, getProfile, handQuality, palmPoint, selectHand, MotionRecognizer, type Gesture, type Point } from '../lib/gestures';
-import { playNote, stopBow, unlockAudio, updateBow } from '../lib/audio';
-import { savePerformance } from '../lib/progress';
+import { playCue, playNote, stopBow, unlockAudio, updateBow } from '../lib/audio';
+import { getProgress, savePerformance, topScores, type Performance, type Tip } from '../lib/progress';
 import { InstrumentArt } from './InstrumentArt';
 import { ARInstrument } from './ARInstrument';
 import { coach, CoachLatch, type CoachHint } from '../lib/coaching';
 export type Instrument = { id: string; name: string; kazakh: string; category: string; subtitle: string; description: string; tag: string; color: string };
 type Phase = 'intro' | 'ready' | 'playing' | 'done';
+type Summary = { record: boolean; rank: number; accuracy: number; seconds: number; bestStreak: number; tips: Tip[]; weak: { name: string; count: number }[]; board: Performance[]; currentId: string };
+const buzz = (pattern: number | number[]) => { try { navigator.vibrate?.(pattern); } catch { /* Haptics are optional. */ } };
+/** Hand-tracking noise is not technique advice; keep it out of the post-performance review. */
+const noise = new Set(['hand-lost', 'ready-lost', 'ready-target', 'reacquired', 'brief-gap', 'jitter', 'setup']);
 const connections = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[0,17],[17,18],[18,19],[19,20]];
-export function Session({ instrument, close, onComplete }: { instrument: Instrument; close: () => void; onComplete: () => void }) {
+export function Session({ instrument, close, onComplete, sound, toggleSound }: { instrument: Instrument; close: () => void; onComplete: () => void; sound: boolean; toggleSound: () => void }) {
   const profile=getProfile(instrument.id);const gestures=profile.gestures;const melody=getMelody(instrument.id);
   const [phase,setPhase]=useState<Phase>('intro');
   const [mode,setMode]=useState<'live'|'demo'|null>(null);
@@ -20,7 +24,8 @@ export function Session({ instrument, close, onComplete }: { instrument: Instrum
   const [trackingRate,setTrackingRate]=useState(0);const [trackingPaused,setTrackingPaused]=useState(false);const [calibrated,setCalibrated]=useState(false);
   const [trace,setTrace]=useState<Point[]>([]);const [readyProgress,setReadyProgress]=useState(0);
   const [index,setIndex]=useState(0);const [mistakes,setMistakes]=useState(0);const [seconds,setSeconds]=useState(45);
-  const [flash,setFlash]=useState(false);const [saved,setSaved]=useState(true);
+  const [flash,setFlash]=useState(false);const [miss,setMiss]=useState(false);const [saved,setSaved]=useState(true);
+  const [streak,setStreak]=useState(0);const [pops,setPops]=useState<{id:number;x:number;y:number}[]>([]);const [summary,setSummary]=useState<Summary|null>(null);
   const [showAR,setShowAR]=useState(()=>{try{return localStorage.getItem('mura-show-ar')!=='false';}catch{return true;}});
   const [aspect,setAspect]=useState(4/3);const [viewport,setViewport]=useState({width:0,height:0});
   const stage=useRef<HTMLDivElement>(null);const video=useRef<HTMLVideoElement>(null);const canvas=useRef<HTMLCanvasElement>(null);
@@ -28,35 +33,61 @@ export function Session({ instrument, close, onComplete }: { instrument: Instrum
   const state=useRef({phase,index,mistakes,mode,start:0,finished:0});
   const dwell=useRef<{since:number;anchor:Point|null;replayArmed:boolean;missingSince:number;frames:Point[][]}>({since:0,anchor:null,replayArmed:false,missingSince:0,frames:[]});
   const action=useRef<(g:Gesture,strength?:number)=>void>(()=>{});const finishRef=useRef<()=>void>(()=>{});const beginRef=useRef<()=>void>(()=>{});
+  const stats=useRef({wrong:{} as Record<string,number>,tips:new Map<string,Tip>(),streak:0,bestStreak:0,lastTip:''});const lastPoint=useRef<Point|null>(null);const popId=useRef(0);const missTimeout=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   const coachLatch=useRef(new CoachLatch());const publish=useRef<(hint:CoachHint,now:number,force?:boolean)=>void>(()=>{});
-  publish.current=(hint,now,force=false)=>{setGuidance(coachLatch.current.update(hint,now,force));};
+  publish.current=(hint,now,force=false)=>{
+    const shown=coachLatch.current.update(hint,now,force);setGuidance(shown);
+    const st=stats.current;
+    if(state.current.phase==='playing'&&shown.tone==='warning'&&!noise.has(shown.code)&&shown.code!==st.lastTip){
+      const known=st.tips.get(shown.code);st.tips.set(shown.code,{title:shown.title,action:shown.action,count:(known?.count??0)+1});
+    }
+    st.lastTip=shown.tone==='warning'?shown.code:'';
+  };
+  function celebrate(){
+    const st=stats.current;st.streak++;st.bestStreak=Math.max(st.bestStreak,st.streak);setStreak(st.streak);playCue('good');buzz(12);
+    const p=lastPoint.current??{x:.5,y:.42};const id=++popId.current;setPops(list=>[...list.slice(-2),{id,x:p.x,y:p.y}]);setTimeout(()=>setPops(list=>list.filter(x=>x.id!==id)),800);
+  }
+  function stumble(expectedId:Gesture){
+    const st=stats.current;st.wrong[expectedId]=(st.wrong[expectedId]??0)+1;st.streak=0;setStreak(0);playCue('miss');buzz([30,40,30]);
+    setMiss(true);clearTimeout(missTimeout.current);missTimeout.current=setTimeout(()=>setMiss(false),320);
+  }
+  function resetStats(){stats.current={wrong:{},tips:new Map(),streak:0,bestStreak:0,lastTip:''};setStreak(0);setPops([]);setSummary(null);}
   const pause=useRef({since:0,missingSince:0});const flashTimeout=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);const noteTimeout=useRef<ReturnType<typeof setTimeout>|undefined>(undefined);
   state.current={...state.current,phase,index,mistakes,mode};
   const score=Math.max(0,index*100-mistakes*25);
   function reset() {
-    stopBow();detector.current.reset();dwell.current={since:0,anchor:null,replayArmed:false,missingSince:0,frames:[]};
+    stopBow();detector.current.reset();resetStats();dwell.current={since:0,anchor:null,replayArmed:false,missingSince:0,frames:[]};
     state.current={...state.current,phase:'ready',index:0,mistakes:0};setIndex(0);setMistakes(0);setSeconds(45);setPhase('ready');setRecognized(null);setTrace([]);setReadyProgress(0);coachLatch.current.reset();publish.current(coach('setup','Подготовь руку',profile.setup),performance.now(),true);pause.current={since:0,missingSince:0};setTrackingPaused(false);setCalibrated(false);
   }
   beginRef.current=()=>{
-    const s=state.current;s.phase='playing';s.index=0;s.mistakes=0;s.start=Date.now();detector.current.reset();detector.current.calibrate(dwell.current.frames);setCalibrated(s.mode==='live');pause.current={since:0,missingSince:0};setTrackingPaused(false);
+    const s=state.current;s.phase='playing';s.index=0;s.mistakes=0;s.start=Date.now();detector.current.reset();resetStats();playCue('start');detector.current.calibrate(dwell.current.frames);setCalibrated(s.mode==='live');pause.current={since:0,missingSince:0};setTrackingPaused(false);
     setPhase('playing');setIndex(0);setMistakes(0);setSeconds(45);setReadyProgress(0);publish.current(coach('begin',gestures[0].name,gestures[0].instruction),performance.now(),true);
   };
   finishRef.current=()=>{
     const s=state.current;if(s.phase!=='playing')return;
     s.phase='done';s.finished=performance.now();stopBow();setPhase('done');dwell.current={since:0,anchor:null,replayArmed:false,missingSince:0,frames:[]};
-    setSaved(savePerformance({id:crypto.randomUUID(),instrument:instrument.name,notes:s.index,mistakes:s.mistakes,score:Math.max(0,s.index*100-s.mistakes*25),date:new Date().toISOString(),demo:s.mode==='demo'}));onComplete();
+    const finalScore=Math.max(0,s.index*100-s.mistakes*25);const st=stats.current;const real=s.mode==='live';
+    const previous=getProgress().filter(p=>!p.demo&&p.instrument===instrument.name);
+    const tips=[...st.tips.values()].sort((a,b)=>b.count-a.count).slice(0,3);
+    const elapsed=Math.min(45,Math.max(1,45-seconds));
+    const entry:Performance={id:crypto.randomUUID(),instrument:instrument.name,notes:s.index,mistakes:s.mistakes,score:finalScore,date:new Date().toISOString(),demo:!real,seconds:elapsed,wrong:st.wrong,tips};
+    setSaved(savePerformance(entry));onComplete();
+    const record=real&&finalScore>0&&finalScore>Math.max(0,...previous.map(p=>p.score));
+    playCue(record?'record':'finish');buzz(record?[20,50,20,50,60]:40);
+    setSummary({record,rank:real?previous.filter(p=>p.score>finalScore).length+1:0,accuracy:s.index+s.mistakes?Math.round(s.index/(s.index+s.mistakes)*100):0,seconds:elapsed,bestStreak:st.bestStreak,tips,
+      weak:Object.entries(st.wrong).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([id,count])=>({name:gestures.find(g=>g.id===id)?.name??id,count})),board:topScores(instrument.name),currentId:entry.id});
   };
   action.current=(g,strength=.7)=>{
     const s=state.current;if(s.phase!=='playing')return;
     if(s.mode==='demo'||instrument.id==='dombyra')playNote(g,instrument.id,strength);
     setRecognized(g);clearTimeout(noteTimeout.current);noteTimeout.current=setTimeout(()=>setRecognized(null),700);
     if(g===melody[s.index]){
-      s.index++;setIndex(s.index);setFlash(true);clearTimeout(flashTimeout.current);flashTimeout.current=setTimeout(()=>setFlash(false),350);publish.current(coach('success','Получилось! +100', 'Теперь: '+(gestures.find(t=>t.id===melody[s.index])?.name??'выступление завершено')+'.',undefined,'success'),performance.now(),true);
+      s.index++;setIndex(s.index);celebrate();setFlash(true);clearTimeout(flashTimeout.current);flashTimeout.current=setTimeout(()=>setFlash(false),350);publish.current(coach('success','Получилось! +100', 'Теперь: '+(gestures.find(t=>t.id===melody[s.index])?.name??'выступление завершено')+'.',undefined,'success'),performance.now(),true);
       if(s.index===melody.length)finishRef.current();
-    }else{s.mistakes++;setMistakes(s.mistakes);const expected=gestures.find(x=>x.id===melody[s.index])!;const actual=gestures.find(x=>x.id===g)!;publish.current(coach('wrong-'+g,'Получился «'+actual.name+'»','Сейчас нужен «'+expected.name+'». '+expected.instruction,undefined,'warning'),performance.now(),true);}
+    }else{s.mistakes++;setMistakes(s.mistakes);stumble(melody[s.index]);const expected=gestures.find(x=>x.id===melody[s.index])!;const actual=gestures.find(x=>x.id===g)!;publish.current(coach('wrong-'+g,'Получился «'+actual.name+'»','Сейчас нужен «'+expected.name+'». '+expected.instruction,undefined,'warning'),performance.now(),true);}
   };
   useEffect(()=>{if(phase!=='playing')return;const interval=setInterval(()=>{const remaining=Math.max(0,45-Math.floor((Date.now()-state.current.start-(pause.current.since?Date.now()-pause.current.since:0))/1000));setSeconds(remaining);if(!remaining)finishRef.current();},200);return()=>clearInterval(interval);},[phase]);
-  useEffect(()=>()=>{clearTimeout(flashTimeout.current);clearTimeout(noteTimeout.current);stopBow();},[]);
+  useEffect(()=>()=>{clearTimeout(flashTimeout.current);clearTimeout(noteTimeout.current);clearTimeout(missTimeout.current);stopBow();},[]);
   useEffect(()=>{try{localStorage.setItem('mura-show-ar',String(showAR));}catch{/* Optional preference. */}},[showAR]);
   // Phones dim the screen while nobody touches it; keep it awake during a performance.
   useEffect(()=>{
@@ -104,7 +135,7 @@ export function Session({ instrument, close, onComplete }: { instrument: Instrum
               pause.current={since:0,missingSince:0};
             }
             const result=detector.current.update(points,now,melody[s.index]);
-            if(paint){setContact(result.point);setTrace(result.trace);}
+            if(paint){lastPoint.current=result.point;setContact(result.point);setTrace(result.trace);}
             draw(points,result.inZone&&!quality);
             if(instrument.id==='kobyz')updateBow(result.bowSpeed);
             // Drum audio follows each physical impact immediately; score waits for the double-hit window.
@@ -165,7 +196,7 @@ export function Session({ instrument, close, onComplete }: { instrument: Instrum
   return <div className="session-sheet" role="dialog" aria-modal="true" aria-labelledby="session-title"><div className="session-inner">
     <div className="session-top">
       <div className="session-title"><h2 id="session-title">{instrument.name}<span> / {instrument.kazakh}</span></h2>{mode&&<span className="pill">{mode==='demo'?'Демо · без камеры':'С камерой'}</span>}</div>
-      <button className="icon-button" onClick={close} aria-label="Закрыть"><X size={20}/></button>
+      <div className="session-tools"><button className="icon-button sound-button" aria-pressed={sound} onClick={toggleSound} aria-label={sound?'Выключить звук':'Включить звук'}>{sound?<Volume2 size={19}/>:<VolumeX size={19}/>}</button><button className="icon-button" onClick={close} aria-label="Закрыть"><X size={20}/></button></div>
     </div>
     {!mode?<div className="session-intro">
       <div className={`intro-art ${instrument.color}`}><InstrumentArt type={instrument.id}/></div>
@@ -183,12 +214,13 @@ export function Session({ instrument, close, onComplete }: { instrument: Instrum
     </div>:<div className="session-play">
       <div className="session-main">
         <div className="session-bar">
-          <div className="session-stats"><span><b>{seconds}</b> {trackingPaused?'пауза':'сек'}</span><span><b>{index}</b> из 9</span><span><b>{score}</b> баллов</span></div>
+          <div className="session-stats"><span><b>{seconds}</b> {trackingPaused?'пауза':'сек'}</span><span><b>{index}</b> из 9</span><span><b>{score}</b> баллов</span>{streak>=2&&<span className="streak" key={streak}>Серия ×{streak}</span>}</div>
           <button className={`ar-toggle ${showAR?'is-on':''}`} aria-pressed={showAR} onClick={()=>setShowAR(!showAR)}>{showAR?<EyeOff size={16}/>:<Eye size={16}/>} {showAR?'Скрыть AR-инструмент':'Показать AR-инструмент'}</button>
         </div>
-        <div ref={stage} className={`camera-stage motion-stage ${flash?'note-flash':''}`} style={{aspectRatio:aspect}}>
+        <div ref={stage} className={`camera-stage motion-stage ${flash?'note-flash':''} ${miss?'note-miss':''}`} style={{aspectRatio:aspect}}>
           <div className="camera-viewport" style={{width:viewport.width||'100%',height:viewport.height||'100%'}}>
             {mode==='live'&&<><video ref={video} muted playsInline autoPlay onLoadedMetadata={e=>{const v=e.currentTarget;setAspect(v.videoWidth/v.videoHeight||4/3);}}/><canvas ref={canvas}/></>}
+            {pops.map(p=><span key={p.id} className="score-pop" style={{left:`${p.x*100}%`,top:`${p.y*100}%`}}>+100</span>)}
             {!loading&&!error&&<ARInstrument instrument={instrument.id} visible={showAR} point={contact} trace={trace} active={recognized} target={phase==='playing'||phase==='ready'?guidance.target:undefined} ready={mode==='live'&&phase==='ready'} progress={readyProgress}/>}
           </div>
           {!loading&&!error&&phase!=='done'&&<div className="camera-status"><span className={`live-dot ${handPresent||mode==='demo'?'':'muted'}`}/>{status}</div>}
@@ -214,6 +246,15 @@ export function Session({ instrument, close, onComplete }: { instrument: Instrum
         <div className="gesture-controls">{gestures.map(g=><button key={g.id} disabled={mode!=='demo'||phase!=='playing'} className={`gesture-control ${phase==='playing'&&g.id===melody[index]?'expected':''} ${recognized===g.id?'detected':''}`} onClick={()=>action.current(g.id)} title={g.instruction}><span className="technique-symbol">{g.symbol}</span><b>{g.name}</b><small>{g.action}</small>{recognized===g.id&&<Check size={16}/>}</button>)}</div>
         <div className="melody-track" aria-label={`Мелодия: ${index} из 9`}>{melody.map((g,i)=><span key={i} className={i<index?'complete':i===index?'current':''}>{i<index?<Check size={14}/>:gestures.find(x=>x.id===g)?.symbol}</span>)}</div>
       </aside>}
+      {phase==='done'&&summary&&<aside className="session-side"><section className="summary" aria-label="Разбор выступления">
+        <h3 className="summary-title">{summary.record?'Новый рекорд':mode==='demo'?'Разбор демо':'Разбор выступления'}</h3>
+        {summary.rank>0&&!summary.record&&<p className="muted">Это {summary.rank}-й результат на этом инструменте.</p>}
+        <div className="summary-stats"><div><b>{summary.accuracy}%</b><span>точность</span></div><div><b>{summary.seconds}</b><span>сек</span></div><div><b>×{summary.bestStreak}</b><span>лучшая серия</span></div></div>
+        {summary.tips.length>0?<div className="summary-block"><h4>Что поправить</h4>{summary.tips.map(t=><div className="hint" key={t.title}><Lightbulb size={18}/><b>{t.title}</b><span>{t.action}</span></div>)}</div>
+          :<p className="summary-clean">Техника чистая: подсказки не понадобились.</p>}
+        {summary.weak.length>0&&<div className="summary-block"><h4>Чаще всего не выходило</h4><ul className="weak-list">{summary.weak.map(w=><li key={w.name}><span>{w.name}</span><b>×{w.count}</b></li>)}</ul></div>}
+        {mode==='live'&&summary.board.length>0&&<div className="summary-block"><h4>Твои лучшие</h4><ol className="rank-list">{summary.board.map((p,i)=><li key={p.id} className={`rank-row ${p.id===summary.currentId?'is-current':''}`}><span className="rank-n">{i+1}</span><span>{new Date(p.date).toLocaleDateString('ru-RU',{day:'numeric',month:'short'})}</span><strong>{p.score}</strong></li>)}</ol></div>}
+      </section></aside>}
     </div>}
   </div></div>;
 }

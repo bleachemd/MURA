@@ -3,7 +3,7 @@ import { ArrowRight, AudioLines, CheckCheck, Copy, Download, ExternalLink, Light
 import QRCode from 'qrcode';
 import { InstrumentArt } from './components/InstrumentArt';
 import { Session, type Instrument } from './components/Session';
-import { getProgress } from './lib/progress';
+import { getProgress, topScores } from './lib/progress';
 import { playNote, setSound, unlockAudio } from './lib/audio';
 import { getProfile } from './lib/gestures';
 
@@ -44,12 +44,14 @@ export default function App() {
   const [sound, updateSound] = useState(true);
   const [progress, setProgress] = useState(getProgress);
   const [preview, setPreview] = useState<string | null>(null);
+  const [boardFilter, setBoardFilter] = useState('all');
   const previewTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const previewEnd = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const copyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const dialogRef = useRef<HTMLDivElement>(null);
   const realProgress = progress.filter(p => !p.demo);
   const best = Math.max(0, ...realProgress.map(p => p.score));
+  const board = boardFilter === 'all' ? topScores(undefined, 10) : topScores(instruments.find(i => i.id === boardFilter)?.name, 10);
   const url = qr ? `${location.origin}${location.pathname}?instrument=${qr.id}` : '';
 
   useEffect(() => { setSound(sound); }, [sound]);
@@ -212,6 +214,16 @@ export default function App() {
           <article className="stat"><strong>{realProgress.length}</strong><span>Выступлений с камерой</span></article>
           <article className="stat"><strong>{new Set(realProgress.map(p => p.instrument)).size}<small> / 3</small></strong><span>Инструментов открыто</span></article>
         </div>
+        <section className="leaderboard">
+          <h2 className="display">Таблица рекордов</h2>
+          <div className="tabs" role="group" aria-label="Инструмент в таблице">
+            <button aria-pressed={boardFilter === 'all'} onClick={() => setBoardFilter('all')}>Все</button>
+            {instruments.map(i => <button key={i.id} aria-pressed={boardFilter === i.id} onClick={() => setBoardFilter(i.id)}>{i.name}</button>)}
+          </div>
+          {board.length
+            ? <ol className="rank-list rank-list-page">{board.map((p, i) => <li className="rank-row" key={p.id}><span className="rank-n">{i + 1}</span><span><b>{p.instrument}</b><small>{new Date(p.date).toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' })}, {p.notes}/9 приёмов</small></span><strong>{p.score}</strong></li>)}</ol>
+            : <p className="muted">Рекорды появятся после первого выступления с камерой. Демо в таблицу не попадает.</p>}
+        </section>
         {progress.length
           ? <section className="history-list"><h2 className="display" style={{ marginBottom: 16 }}>Последние выступления</h2>
             {progress.map(p => <div className="history-row" key={p.id}>
@@ -244,7 +256,7 @@ export default function App() {
     </main>
 
     {(session || qr) && <div ref={dialogRef}>
-      {session && <Session key={session.id} instrument={session} close={() => { setSession(null); if (location.search) history.replaceState(null, '', location.pathname); }} onComplete={() => setProgress(getProgress())} />}
+      {session && <Session key={session.id} instrument={session} close={() => { setSession(null); if (location.search) history.replaceState(null, '', location.pathname); }} onComplete={() => setProgress(getProgress())} sound={sound} toggleSound={() => updateSound(s => !s)} />}
       {qr && <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setQr(null); }}>
         <section className="qr-modal" role="dialog" aria-modal="true" aria-labelledby="qr-title">
           <div className="modal-header"><span className="muted">Открой на телефоне</span><button className="icon-button" aria-label="Закрыть QR-код" onClick={() => setQr(null)}><X size={20} /></button></div>
