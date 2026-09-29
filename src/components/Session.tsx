@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Camera, Check, CircleHelp, Eye, EyeOff, LoaderCircle, Maximize, Music2, RotateCcw, ShieldCheck, Timer, Trophy, X } from 'lucide-react';
+import { Camera, Check, CircleAlert, Eye, EyeOff, Lightbulb, LoaderCircle, Maximize, RotateCcw, ShieldCheck, Trophy, X } from 'lucide-react';
 import type { HandLandmarker } from '@mediapipe/tasks-vision';
 import { distance, getMelody, getProfile, handQuality, palmPoint, selectHand, MotionRecognizer, type Gesture, type Point } from '../lib/gestures';
 import { playNote, stopBow, unlockAudio, updateBow } from '../lib/audio';
@@ -69,7 +69,7 @@ export function Session({ instrument, close, onComplete }: { instrument: Instrum
     const draw=(points:Point[],valid:boolean)=>{
       const c=canvas.current;const v=video.current;if(!c||!v)return;
       if(c.width!==(v.videoWidth||640))c.width=v.videoWidth||640;if(c.height!==(v.videoHeight||480))c.height=v.videoHeight||480;const ctx=c.getContext('2d');if(!ctx)return;
-      ctx.clearRect(0,0,c.width,c.height);ctx.strokeStyle=valid?'#cdeb94':'#f4bb6b';ctx.fillStyle=valid?'#e4ffbe':'#ffd09b';ctx.lineWidth=2;
+      ctx.clearRect(0,0,c.width,c.height);ctx.strokeStyle=valid?'#4fcbc1':'#e6ac3c';ctx.fillStyle=valid?'#b8f3ee':'#ffd98f';ctx.lineWidth=2;
       for(const [a,b]of connections){if(!points[a]||!points[b])continue;ctx.beginPath();ctx.moveTo(points[a].x*c.width,points[a].y*c.height);ctx.lineTo(points[b].x*c.width,points[b].y*c.height);ctx.stroke();}
       for(const p of points){if(!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;ctx.beginPath();ctx.arc(p.x*c.width,p.y*c.height,3,0,Math.PI*2);ctx.fill();}
     };
@@ -150,25 +150,61 @@ export function Session({ instrument, close, onComplete }: { instrument: Instrum
   },[mode,instrument.id]);
   async function start(demo=false){await unlockAudio().catch(()=>{});setError('');setMode(demo?'demo':'live');if(demo){setLoading(false);reset();}}
   const expected=gestures.find(g=>g.id===melody[index]);
-  return <div className="modal-backdrop" onClick={e=>{if(e.target===e.currentTarget)close();}}><section className="session-modal" role="dialog" aria-modal="true" aria-labelledby="session-title">
-    <div className="modal-header"><div className="eyebrow"><span className="live-dot"/> ТВОЯ МУЗЫКАЛЬНАЯ СЦЕНА</div><button className="icon-button" onClick={close} aria-label="Закрыть"><X size={21}/></button></div>
-    <div className="session-title"><h2 id="session-title">{instrument.name}<span> / {instrument.kazakh}</span></h2><span className="pill">{mode==='demo'?'Демо · без камеры':'Настоящие движения · AR'}</span></div>
-    {!mode?<div className="session-intro"><div className={`intro-art ${instrument.color}`}><InstrumentArt type={instrument.id}/><span className="art-caption">НАСЛЕДИЕ, КОТОРОЕ ЗВУЧИТ</span></div><div className="intro-content"><span className="eyebrow">ИГРАЙ, КАК НА ИНСТРУМЕНТЕ</span><h3>Почувствуй<br/>{instrument.id==='dombyra'?'движение струн.':instrument.id==='kobyz'?'ход смычка.':'силу ритма.'}</h3><p>{profile.setup}</p><div className="intro-gestures">{gestures.map(g=><div key={g.id}><span className="technique-symbol">{g.symbol}</span><div><b>{g.name}</b><small>{g.action}</small></div></div>)}</div><p className="intro-challenge">9 приёмов · 45 секунд · до 900 баллов</p><button className="button primary" onClick={()=>void start()}><Camera size={18}/> Включить камеру <ArrowRight size={18}/></button><button className="text-button" onClick={()=>void start(true)}>Попробовать демо без камеры <ArrowRight size={15}/></button><p className="privacy-note"><ShieldCheck size={15}/> Видео остаётся на устройстве. Инструмент поверх камеры можно скрыть.</p></div></div>:<>
-      <div className="session-toolbar"><div className="session-stats"><span><Timer size={17}/><b>{seconds}</b> {trackingPaused?'пауза':'сек'}</span><span><Music2 size={17}/><b>{index}</b> / 9</span><span><Trophy size={17}/><b>{score}</b> баллов</span></div><button className={`ar-toggle ${showAR?'is-on':''}`} aria-pressed={showAR} onClick={()=>setShowAR(!showAR)}>{showAR?<EyeOff size={15}/>:<Eye size={15}/>} {showAR?'Скрыть AR-инструмент':'Показать AR-инструмент'}</button></div>
-      <div ref={stage} className={`camera-stage motion-stage ${flash?'note-flash':''}`}>
-        <div className="camera-viewport" style={{width:viewport.width||'100%',height:viewport.height||'100%'}}>
-          {mode==='live'&&<><video ref={video} muted playsInline autoPlay onLoadedMetadata={e=>{const v=e.currentTarget;setAspect(v.videoWidth/v.videoHeight||4/3);}}/><canvas ref={canvas}/></>}
-          {!loading&&!error&&<ARInstrument instrument={instrument.id} visible={showAR} point={contact} trace={trace} active={recognized} target={phase==='playing'||phase==='ready'?guidance.target:undefined} ready={mode==='live'&&phase==='ready'} progress={readyProgress}/>}
+  const status=mode==='demo'?'Демо без камеры':trackingPaused?'Пауза: верни руку в кадр':handPresent?'Кисть в кадре':'Ищем руку';
+  const CoachIcon=guidance.tone==='success'?Check:guidance.tone==='warning'?CircleAlert:Lightbulb;
+  const coachKind=mode==='demo'?'Демо':guidance.tone==='success'?'Получилось':guidance.tone==='warning'?'Поправь':'Подсказка';
+  return <div className="session-sheet" role="dialog" aria-modal="true" aria-labelledby="session-title"><div className="session-inner">
+    <div className="session-top">
+      <div className="session-title"><h2 id="session-title">{instrument.name}<span> / {instrument.kazakh}</span></h2>{mode&&<span className="pill">{mode==='demo'?'Демо · без камеры':'С камерой'}</span>}</div>
+      <button className="icon-button" onClick={close} aria-label="Закрыть"><X size={20}/></button>
+    </div>
+    {!mode?<div className="session-intro">
+      <div className={`intro-art ${instrument.color}`}><InstrumentArt type={instrument.id}/></div>
+      <div className="intro-content">
+        <h3>Почувствуй<br/>{instrument.id==='dombyra'?'движение струн.':instrument.id==='kobyz'?'ход смычка.':'силу ритма.'}</h3>
+        <p className="lead">{profile.setup}</p>
+        <div className="intro-gestures">{gestures.map(g=><div key={g.id}><span className="technique-symbol">{g.symbol}</span><div><b>{g.name}</b><small>{g.action}</small></div></div>)}</div>
+        <p className="intro-challenge">9 приёмов, 45 секунд, до 900 баллов</p>
+        <div className="intro-cta">
+          <button className="button primary" onClick={()=>void start()}><Camera size={18}/> Включить камеру</button>
+          <button className="text-button" onClick={()=>void start(true)}>Попробовать демо без камеры</button>
         </div>
-        {!loading&&!error&&phase!=='done'&&<div className="camera-status"><span className={`live-dot ${handPresent?'':'muted'}`}/>{mode==='demo'?'ДЕМО-РЕЖИМ':trackingPaused?'ПАУЗА · ВЕРНИ РУКУ':handPresent?'КИСТЬ В КАДРЕ':'ИЩЕМ РУКУ'}</div>}
-        {loading&&<div className="stage-overlay"><LoaderCircle className="spin" size={36}/><h3>Готовим твою сцену</h3><p>Запускаем камеру и распознавание движений…</p></div>}
-        {error&&<div className="stage-overlay"><Camera size={32}/><h3>Камере нужна помощь</h3><p>{error}</p><button className="button light" onClick={()=>{setMode(null);setPhase('intro');setError('');}}>Попробовать снова</button><button className="text-button light-text" onClick={()=>void start(true)}>Открыть демо</button></div>}
-        {!loading&&!error&&phase==='ready'&&(mode==='demo'?<div className="demo-ready"><p>Послушай приёмы и собери мелодию.<br/>В демо вместо движений работают кнопки.</p><button className="button light" onClick={()=>beginRef.current()}>Начать выступление <ArrowRight size={16}/></button></div>:<div className="motion-ready-label"><b>Совмести точку на кисти с меткой</b><span>Задержись на секунду — выступление начнётся само</span><div className="ready-meter"><i style={{width:`${readyProgress*100}%`}}/></div></div>)}
-        {phase==='playing'&&!error&&<div className="next-gesture"><span className="technique-symbol">{expected?.symbol}</span><div><small>СЛЕДУЮЩИЙ ПРИЁМ</small><strong>{expected?.name}</strong></div><span className="note-count">{index+1}/9</span></div>}
-        {phase==='done'&&<div className="stage-overlay result-overlay"><div className="trophy-circle"><Trophy size={34}/></div><span className="eyebrow">{mode==='demo'?'ДЕМО ЗАВЕРШЕНО':'ТВОЁ ВЫСТУПЛЕНИЕ ЗАВЕРШЕНО'}</span><h3>{index===9?'Звучит как начало большого пути!':'Музыка начинается с практики'}</h3><div className="result-score">{score}<span> / 900 баллов</span></div><p>{index} из 9 приёмов · ошибок: {mistakes}</p><button className="button light" onClick={reset}><RotateCcw size={16}/> Сыграть ещё</button>{mode==='live'&&<small>Без кнопки: убери руку из кадра, затем покажи и задержи её на секунду</small>}<small>{saved?mode==='demo'?'Демо сохранено отдельно от настоящих выступлений':'Результат сохранён на этом устройстве':'Не удалось сохранить результат: память браузера недоступна'}</small></div>}
+        <p className="privacy-note"><ShieldCheck size={15}/> Видео остаётся на устройстве. Инструмент поверх камеры можно скрыть.</p>
       </div>
-      {phase!=='done'&&<><div className={`gesture-feedback coach-feedback ${guidance.tone==='success'?'success':guidance.tone==='warning'?'coach-warning':''}`} aria-live="polite" aria-atomic="true"><CircleHelp size={21}/><div><b>{mode==='demo'?'Пробуем без камеры':guidance.title}</b><span>{mode==='demo'?'Выбирай карточки приёмов. С камерой те же звуки играются движением руки.':guidance.action}</span>{mode==='live'&&trackingPaused&&<small>Таймер ждёт — за потерю руки баллы не снимаются.</small>}</div></div><div className="gesture-controls">{gestures.map(g=><button key={g.id} disabled={mode!=='demo'||phase!=='playing'} className={`gesture-control ${phase==='playing'&&g.id===melody[index]?'expected':''} ${recognized===g.id?'detected':''}`} onClick={()=>action.current(g.id)} title={g.instruction}><span className="gesture-symbol technique-symbol">{g.symbol}</span><b>{g.name}</b><small>{g.action}</small>{recognized===g.id&&<Check size={16}/>}</button>)}</div><p className="motion-instruction">{phase==='playing'?expected?.instruction:profile.setup}</p><div className="melody-track">{melody.map((g,i)=><span key={i} className={i<index?'complete':i===index?'current':''}>{i<index?<Check size={14}/>:gestures.find(x=>x.id===g)?.symbol}</span>)}</div></>}
-      <div className="session-footer"><span><Maximize size={14}/> {showAR?'Играй в подсвеченной зоне':'AR скрыт · игровая зона остаётся на месте'}</span><span><ShieldCheck size={14}/> {mode==='live'&&calibrated?'Подстроено под руку · ':''}{mode==='live'&&trackingRate>0?`${trackingRate} кадр/с`:'Видео только на устройстве'}</span></div>
-    </>}
-  </section></div>;
+    </div>:<div className="session-play">
+      <div className="session-main">
+        <div className="session-bar">
+          <div className="session-stats"><span><b>{seconds}</b> {trackingPaused?'пауза':'сек'}</span><span><b>{index}</b> из 9</span><span><b>{score}</b> баллов</span></div>
+          <button className={`ar-toggle ${showAR?'is-on':''}`} aria-pressed={showAR} onClick={()=>setShowAR(!showAR)}>{showAR?<EyeOff size={16}/>:<Eye size={16}/>} {showAR?'Скрыть AR-инструмент':'Показать AR-инструмент'}</button>
+        </div>
+        <div ref={stage} className={`camera-stage motion-stage ${flash?'note-flash':''}`}>
+          <div className="camera-viewport" style={{width:viewport.width||'100%',height:viewport.height||'100%'}}>
+            {mode==='live'&&<><video ref={video} muted playsInline autoPlay onLoadedMetadata={e=>{const v=e.currentTarget;setAspect(v.videoWidth/v.videoHeight||4/3);}}/><canvas ref={canvas}/></>}
+            {!loading&&!error&&<ARInstrument instrument={instrument.id} visible={showAR} point={contact} trace={trace} active={recognized} target={phase==='playing'||phase==='ready'?guidance.target:undefined} ready={mode==='live'&&phase==='ready'} progress={readyProgress}/>}
+          </div>
+          {!loading&&!error&&phase!=='done'&&<div className="camera-status"><span className={`live-dot ${handPresent||mode==='demo'?'':'muted'}`}/>{status}</div>}
+          {loading&&<div className="stage-overlay"><LoaderCircle className="spin" size={36}/><h3>Готовим твою сцену</h3><p>Запускаем камеру и распознавание движений…</p></div>}
+          {error&&<div className="stage-overlay"><Camera size={32}/><h3>Камере нужна помощь</h3><p>{error}</p><button className="button light" onClick={()=>{setMode(null);setPhase('intro');setError('');}}>Попробовать снова</button><button className="text-button light-text" onClick={()=>void start(true)}>Открыть демо</button></div>}
+          {!loading&&!error&&phase==='ready'&&(mode==='demo'?<div className="demo-ready"><p>Послушай приёмы и собери мелодию. В демо вместо движений работают кнопки.</p><button className="button light" onClick={()=>beginRef.current()}>Начать выступление</button></div>:<div className="motion-ready-label"><b>Совмести точку на кисти с меткой</b><span>Задержись на секунду — выступление начнётся само</span><div className="ready-meter"><i style={{'--p':readyProgress} as React.CSSProperties}/></div></div>)}
+          {phase==='done'&&<div className="stage-overlay result-overlay"><div className="trophy-circle"><Trophy size={30}/></div><span className="muted">{mode==='demo'?'Демо завершено':'Твоё выступление завершено'}</span><h3>{index===9?'Звучит как начало большого пути!':'Музыка начинается с практики'}</h3><div className="result-score">{score}<span> / 900 баллов</span></div><p>{index} из 9 приёмов, ошибок: {mistakes}</p><button className="button light" onClick={reset}><RotateCcw size={16}/> Сыграть ещё</button>{mode==='live'&&<small>Без кнопки: убери руку из кадра, затем покажи и задержи её на секунду</small>}<small>{saved?mode==='demo'?'Демо сохранено отдельно от настоящих выступлений':'Результат сохранён на этом устройстве':'Не удалось сохранить результат: память браузера недоступна'}</small></div>}
+        </div>
+        <div className="session-footer"><span><Maximize size={14}/> {showAR?'Играй в подсвеченной зоне':'AR скрыт, игровая зона остаётся на месте'}</span><span><ShieldCheck size={14}/> {mode==='live'&&calibrated?'Подстроено под руку · ':''}{mode==='live'&&trackingRate>0?`${trackingRate} кадр/с`:'Видео только на устройстве'}</span></div>
+      </div>
+      {phase!=='done'&&<aside className="session-side">
+        <div className={`gesture-feedback coach-feedback ${guidance.tone==='success'?'success':guidance.tone==='warning'?'coach-warning':''}`} aria-live="polite" aria-atomic="true">
+          <span className="coach-icon"><CoachIcon size={20}/></span>
+          <div className="coach-text" key={mode==='demo'?'demo':guidance.code}>
+            <span className="coach-kind">{coachKind}</span>
+            <b>{mode==='demo'?'Пробуем без камеры':guidance.title}</b>
+            <span>{mode==='demo'?'Выбирай карточки приёмов. С камерой те же звуки играются движением руки.':guidance.action}</span>
+            {mode==='live'&&trackingPaused&&<small>Таймер ждёт — за потерю руки баллы не снимаются.</small>}
+          </div>
+        </div>
+        {phase==='playing'&&<div className="next-gesture"><span className="technique-symbol">{expected?.symbol}</span><div><small>Следующий приём</small><strong>{expected?.name}</strong></div></div>}
+        <p className="motion-instruction">{phase==='playing'?expected?.instruction:profile.setup}</p>
+        <div className="gesture-controls">{gestures.map(g=><button key={g.id} disabled={mode!=='demo'||phase!=='playing'} className={`gesture-control ${phase==='playing'&&g.id===melody[index]?'expected':''} ${recognized===g.id?'detected':''}`} onClick={()=>action.current(g.id)} title={g.instruction}><span className="technique-symbol">{g.symbol}</span><b>{g.name}</b><small>{g.action}</small>{recognized===g.id&&<Check size={16}/>}</button>)}</div>
+        <div className="melody-track" aria-label={`Мелодия: ${index} из 9`}>{melody.map((g,i)=><span key={i} className={i<index?'complete':i===index?'current':''}>{i<index?<Check size={14}/>:gestures.find(x=>x.id===g)?.symbol}</span>)}</div>
+      </aside>}
+    </div>}
+  </div></div>;
 }
