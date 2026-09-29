@@ -109,7 +109,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
   },[mode,aspect]);
   useEffect(()=>{
     if(mode!=='live')return;
-    let cancelled=false;let stream:MediaStream|undefined;let model:HandLandmarker|undefined;let frame=0;let previousFrame=-1;let lastTime=0;let lastPaint=0;let rateStart=performance.now();let workMs=0;let delegate:'GPU'|'CPU'='GPU';let swapping=false;let makeModel:((d:'GPU'|'CPU')=>Promise<HandLandmarker>)|undefined;let processed=0;let anchor:Point=profile.ready;let videoCallback=false;let starved=0;
+    let cancelled=false;let stream:MediaStream|undefined;let model:HandLandmarker|undefined;let frame=0;let previousFrame=-1;let lastTime=0;let lastPaint=0;let rateStart=performance.now();let workMs=0;let delegate:'GPU'|'CPU'='GPU';let swapping=false;let makeModel:((d:'GPU'|'CPU')=>Promise<HandLandmarker>)|undefined;let processed=0;let anchor:Point=profile.ready;let videoCallback=false;let starved=0;let degenerate=0;
     const draw=(points:Point[],valid:boolean)=>{
       const c=canvas.current;const v=video.current;if(!c||!v)return;
       if(c.width!==(v.videoWidth||640))c.width=v.videoWidth||640;if(c.height!==(v.videoHeight||480))c.height=v.videoHeight||480;const ctx=c.getContext('2d');if(!ctx)return;
@@ -122,6 +122,15 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
       const now=performance.now();
       const v=video.current;
       if(v&&model&&v.readyState>=2&&v.currentTime!==previousFrame&&now-lastTime>=28){
+        // Some cameras hand back a degenerate stream: it plays, but the frame is a few
+        // pixels wide and nothing can be recognised in it. Without this the coach would
+        // sit on its opening line forever with no explanation.
+        if(v.videoWidth<64||v.videoHeight<64){
+          if(!degenerate)degenerate=now;
+          if(now-degenerate>4000){stopBow();setError('other');stream?.getTracks().forEach(t=>t.stop());return;}
+          schedule();return;
+        }
+        degenerate=0;
         previousFrame=v.currentTime;lastTime=now;const workStart=performance.now();
         try{
           const all=model.detectForVideo(v,now).landmarks.map(hand=>hand.map(p=>({...p,x:1-p.x})));
