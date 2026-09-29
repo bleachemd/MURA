@@ -17,10 +17,13 @@ mkdirSync('artifacts', { recursive: true });
 const localChrome='/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const executablePath=process.env.CHROME_PATH || (existsSync(localChrome)?localChrome:undefined);
 browser = await chromium.launch({executablePath,headless:true,args:['--use-fake-ui-for-media-stream','--use-fake-device-for-media-stream']});
-const page = await browser.newPage({viewport:{width:1440,height:1120},reducedMotion:'reduce'});
+const page = await browser.newPage({locale:'ru-RU',viewport:{width:1440,height:1120},reducedMotion:'reduce'});
 const errors=[];page.on('pageerror',e=>errors.push(e.message));
 await page.goto(baseURL);await page.evaluate(()=>document.fonts.ready);
 await page.screenshot({path:'artifacts/desktop.png',fullPage:true});
+await page.getByRole('button',{name:'EN',exact:true}).click();await page.getByRole('heading',{name:'Music in your hands.'}).waitFor();await page.screenshot({path:'artifacts/desktop-en.png',fullPage:true});
+await page.getByRole('button',{name:'ҚАЗ',exact:true}).click();await page.getByRole('heading',{name:'Музыка қолыңда.'}).waitFor();await page.screenshot({path:'artifacts/desktop-kk.png',fullPage:true});
+await page.getByRole('button',{name:'RU',exact:true}).click();await page.getByRole('heading',{name:'Музыка в твоих руках.'}).waitFor();
 await page.getByRole('button',{name:'QR-код: Кобыз'}).click();await page.locator('.qr-image img').waitFor();
 if(!(await page.locator('.qr-url').inputValue()).includes('instrument=kobyz'))throw Error('QR link failed');
 await page.keyboard.press('Escape');
@@ -62,7 +65,15 @@ const overflow=await page.evaluate(()=>document.documentElement.scrollWidth>wind
 await page.getByRole('button',{name:'Как это работает',exact:true}).click();
 await page.getByRole('heading',{name:'Пусть руки говорят.'}).waitFor();
 await page.screenshot({path:'artifacts/mobile-guide.png',fullPage:true});
-const denied=await browser.newPage();
+const kz=await browser.newPage({locale:'kk-KZ',viewport:{width:1100,height:900},reducedMotion:'reduce'});
+await kz.goto(`${baseURL}/?instrument=kobyz`);
+await kz.getByRole('heading',{name:'Қобыз / Kobyz'}).waitFor();
+await kz.getByRole('button',{name:'Камерасыз демоны байқау'}).click();
+await kz.getByRole('button',{name:'Өнерді бастау',exact:true}).click();
+await kz.getByText('Ысқыш оңға').first().waitFor();
+await kz.screenshot({path:'artifacts/session-kk.png'});
+await kz.close();
+const denied=await browser.newPage({locale:'ru-RU'});
 await denied.addInitScript(()=>{navigator.mediaDevices.getUserMedia=async()=>{throw new DOMException('Denied','NotAllowedError');};});
 await denied.goto(`${baseURL}/?instrument=kobyz`);
 await denied.getByRole('heading',{name:'Кобыз / Қобыз'}).waitFor();
@@ -72,7 +83,7 @@ await denied.getByRole('button',{name:'Открыть демо',exact:true}).cli
 await denied.getByRole('button',{name:'Начать выступление',exact:true}).waitFor();
 await denied.close();
 for(const [id,names] of [['kobyz',['Смычок вправо','Смычок влево','Короткий штрих']],['dauylpaz',['Удар в центр','Удар по краю','Двойной удар']]]){
-  const demo=await browser.newPage({viewport:{width:390,height:844},reducedMotion:'reduce'});
+  const demo=await browser.newPage({locale:'ru-RU',viewport:{width:390,height:844},reducedMotion:'reduce'});
   await demo.goto(`${baseURL}/?instrument=${id}`);
   await demo.getByRole('button',{name:'Попробовать демо без камеры'}).click();
   await demo.getByRole('button',{name:'Начать выступление',exact:true}).click();
@@ -83,7 +94,7 @@ for(const [id,names] of [['kobyz',['Смычок вправо','Смычок в�
   await demo.close();
 }
 // Synthetic landmark integration: the real camera/model initialization is verified separately above.
-const motion=await browser.newPage({viewport:{width:1100,height:950},reducedMotion:'reduce'});
+const motion=await browser.newPage({locale:'ru-RU',viewport:{width:1100,height:950},reducedMotion:'reduce'});
 await motion.route(/@mediapipe_tasks-vision\.js/,route=>route.fulfill({contentType:'text/javascript',body:`export const FilesetResolver={forVisionTasks:async()=>({})};export const HandLandmarker={createFromOptions:async()=>({detectForVideo:()=>({landmarks:window.__landmarks?[window.__landmarks]:[]}),close:()=>{}})};`}));
 await motion.goto(`${baseURL}/?instrument=dombyra`);
 await motion.getByRole('button',{name:'Включить камеру',exact:true}).click();

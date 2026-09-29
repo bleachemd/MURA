@@ -4,18 +4,20 @@ import type { HandLandmarker } from '@mediapipe/tasks-vision';
 import { distance, getMelody, getProfile, handQuality, palmPoint, selectHand, MotionRecognizer, type Gesture, type Point } from '../lib/gestures';
 import { playCue, playNote, stopBow, unlockAudio, updateBow } from '../lib/audio';
 import { getProgress, savePerformance, topScores, type Performance, type Tip } from '../lib/progress';
+import { localizeHint, locales, useI18n } from '../i18n';
 import { InstrumentArt } from './InstrumentArt';
 import { ARInstrument } from './ARInstrument';
 import { coach, CoachLatch, type CoachHint } from '../lib/coaching';
 export type Instrument = { id: string; name: string; kazakh: string; category: string; subtitle: string; description: string; tag: string; color: string };
 type Phase = 'intro' | 'ready' | 'playing' | 'done';
-type Summary = { record: boolean; rank: number; accuracy: number; seconds: number; bestStreak: number; tips: Tip[]; weak: { name: string; count: number }[]; board: Performance[]; currentId: string };
+type Summary = { record: boolean; rank: number; accuracy: number; seconds: number; bestStreak: number; tips: Tip[]; weak: { id: string; count: number }[]; board: Performance[]; currentId: string };
 const buzz = (pattern: number | number[]) => { try { navigator.vibrate?.(pattern); } catch { /* Haptics are optional. */ } };
 /** Hand-tracking noise is not technique advice; keep it out of the post-performance review. */
 const noise = new Set(['hand-lost', 'ready-lost', 'ready-target', 'reacquired', 'brief-gap', 'jitter', 'setup']);
 const connections = [[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[0,17],[17,18],[18,19],[19,20]];
 export function Session({ instrument, close, onComplete, sound, toggleSound }: { instrument: Instrument; close: () => void; onComplete: () => void; sound: boolean; toggleSound: () => void }) {
   const profile=getProfile(instrument.id);const gestures=profile.gestures;const melody=getMelody(instrument.id);
+  const {t,lang}=useI18n();const tRef=useRef(t);tRef.current=t;const langRef=useRef(lang);langRef.current=lang;
   const [phase,setPhase]=useState<Phase>('intro');
   const [mode,setMode]=useState<'live'|'demo'|null>(null);
   const [loading,setLoading]=useState(false);const [error,setError]=useState('');
@@ -26,6 +28,8 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
   const [index,setIndex]=useState(0);const [mistakes,setMistakes]=useState(0);const [seconds,setSeconds]=useState(45);
   const [flash,setFlash]=useState(false);const [miss,setMiss]=useState(false);const [saved,setSaved]=useState(true);
   const [streak,setStreak]=useState(0);const [pops,setPops]=useState<{id:number;x:number;y:number}[]>([]);const [summary,setSummary]=useState<Summary|null>(null);
+  // Lite mode: when the camera loop starves, cut UI painting (not recognition) so the main thread can keep up.
+  const [lite,setLite]=useState(false);const liteRef=useRef(false);const lowRate=useRef(0);const autoLite=useRef(true);
   const [showAR,setShowAR]=useState(()=>{try{return localStorage.getItem('mura-show-ar')!=='false';}catch{return true;}});
   const [aspect,setAspect]=useState(4/3);const [viewport,setViewport]=useState({width:0,height:0});
   const stage=useRef<HTMLDivElement>(null);const video=useRef<HTMLVideoElement>(null);const canvas=useRef<HTMLCanvasElement>(null);
@@ -39,7 +43,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
     const shown=coachLatch.current.update(hint,now,force);setGuidance(shown);
     const st=stats.current;
     if(state.current.phase==='playing'&&shown.tone==='warning'&&!noise.has(shown.code)&&shown.code!==st.lastTip){
-      const known=st.tips.get(shown.code);st.tips.set(shown.code,{title:shown.title,action:shown.action,count:(known?.count??0)+1});
+      const known=st.tips.get(shown.code);const loc=localizeHint(langRef.current,shown,{instrument:instrument.id,nextId:melody[state.current.index]});st.tips.set(shown.code,{title:loc.title,action:loc.action,count:(known?.count??0)+1});
     }
     st.lastTip=shown.tone==='warning'?shown.code:'';
   };
@@ -75,7 +79,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
     const record=real&&finalScore>0&&finalScore>Math.max(0,...previous.map(p=>p.score));
     playCue(record?'record':'finish');buzz(record?[20,50,20,50,60]:40);
     setSummary({record,rank:real?previous.filter(p=>p.score>finalScore).length+1:0,accuracy:s.index+s.mistakes?Math.round(s.index/(s.index+s.mistakes)*100):0,seconds:elapsed,bestStreak:st.bestStreak,tips,
-      weak:Object.entries(st.wrong).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([id,count])=>({name:gestures.find(g=>g.id===id)?.name??id,count})),board:topScores(instrument.name),currentId:entry.id});
+      weak:Object.entries(st.wrong).sort((a,b)=>b[1]-a[1]).slice(0,3).map(([id,count])=>({id,count})),board:topScores(instrument.name),currentId:entry.id});
   };
   action.current=(g,strength=.7)=>{
     const s=state.current;if(s.phase!=='playing')return;
@@ -110,7 +114,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
       const c=canvas.current;const v=video.current;if(!c||!v)return;
       if(c.width!==(v.videoWidth||640))c.width=v.videoWidth||640;if(c.height!==(v.videoHeight||480))c.height=v.videoHeight||480;const ctx=c.getContext('2d');if(!ctx)return;
       ctx.clearRect(0,0,c.width,c.height);ctx.strokeStyle=valid?'#4fcbc1':'#e6ac3c';ctx.fillStyle=valid?'#b8f3ee':'#ffd98f';ctx.lineWidth=2;
-      for(const [a,b]of connections){if(!points[a]||!points[b])continue;ctx.beginPath();ctx.moveTo(points[a].x*c.width,points[a].y*c.height);ctx.lineTo(points[b].x*c.width,points[b].y*c.height);ctx.stroke();}
+      if(!liteRef.current)for(const [a,b]of connections){if(!points[a]||!points[b])continue;ctx.beginPath();ctx.moveTo(points[a].x*c.width,points[a].y*c.height);ctx.lineTo(points[b].x*c.width,points[b].y*c.height);ctx.stroke();}
       for(const p of points){if(!Number.isFinite(p.x)||!Number.isFinite(p.y))continue;ctx.beginPath();ctx.arc(p.x*c.width,p.y*c.height,3,0,Math.PI*2);ctx.fill();}
     };
     const loop=()=>{
@@ -123,8 +127,11 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
           const all=model.detectForVideo(v,now).landmarks.map(hand=>hand.map(p=>({...p,x:1-p.x})));
           const points=selectHand(all,anchor);const quality=handQuality(points);const s=state.current;
           const center=quality?null:palmPoint(points);if(center)anchor=center;
-          const paint=now-lastPaint>=60;processed++;
-          if(now-rateStart>1500){setTrackingRate(Math.round(processed*1000/(now-rateStart)));processed=0;rateStart=now;}
+          const paint=now-lastPaint>=(liteRef.current?120:60);processed++;
+          if(now-rateStart>1500){
+            const rate=Math.round(processed*1000/(now-rateStart));setTrackingRate(rate);processed=0;rateStart=now;
+            if(autoLite.current&&!liteRef.current&&!document.hidden&&s.phase!=='done'){lowRate.current=rate<16?lowRate.current+1:0;if(lowRate.current>=2){liteRef.current=true;setLite(true);}}
+          }
           if(paint){lastPaint=now;setHandPresent(!quality);}
           if(s.phase==='playing'){
             if(quality){
@@ -135,7 +142,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
               pause.current={since:0,missingSince:0};
             }
             const result=detector.current.update(points,now,melody[s.index]);
-            if(paint){lastPoint.current=result.point;setContact(result.point);setTrace(result.trace);}
+            if(paint){lastPoint.current=result.point;setContact(result.point);setTrace(liteRef.current?[]:result.trace);}
             draw(points,result.inZone&&!quality);
             if(instrument.id==='kobyz')updateBow(result.bowSpeed);
             // Drum audio follows each physical impact immediately; score waits for the double-hit window.
@@ -157,7 +164,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
             }else if(!quality||!d.missingSince||now-d.missingSince>180){d.anchor=null;d.since=0;d.frames=[];if(paint)setReadyProgress(0);}
             if(s.phase==='ready'&&paint)publish.current(quality?coach('ready-lost','Покажи руку',quality,profile.ready,'warning'):onTarget?coach('calibrating','Настраиваюсь под твою руку','Задержи точку на метке ещё на мгновение.',profile.ready):coach('ready-target','Кисть к жёлтой метке','Совмести светящуюся точку с кругом. Нажимать ничего не нужно.',profile.ready),now);
           }
-        }catch{stopBow();setError('Не удалось обработать изображение. Перезапусти камеру или открой демо.');stream?.getTracks().forEach(t=>t.stop());return;}
+        }catch{stopBow();setError('process');stream?.getTracks().forEach(t=>t.stop());return;}
       }
       schedule();
     };
@@ -181,7 +188,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
         setLoading(false);reset();rateStart=performance.now();processed=0;schedule();
       }catch(e){
         stream?.getTracks().forEach(t=>t.stop());if(cancelled)return;setLoading(false);const name=(e as Error).name;
-        setError((e as Error).message==='secure'?'Для камеры нужна защищённая ссылка HTTPS или localhost. Открой сайт по HTTPS.':name==='NotAllowedError'?'Доступ к камере закрыт. Разреши камеру в настройках сайта рядом с адресной строкой и попробуй снова.':name==='NotFoundError'?'Камера не найдена. Подключи веб-камеру или открой ссылку на телефоне.':name==='NotReadableError'?'Камера занята другим приложением. Закрой его и попробуй снова.':'Не удалось запустить распознавание. Проверь соединение и доступ к камере, затем попробуй снова.');
+        setError((e as Error).message==='secure'?'secure':name==='NotAllowedError'?'denied':name==='NotFoundError'?'notfound':name==='NotReadableError'?'busy':'other');
       }
     }
     const onVisibility=()=>{if(document.hidden){stopBow();detector.current.reset();if(state.current.phase==='playing'&&!pause.current.since){pause.current.since=Date.now();setTrackingPaused(true);}}};
@@ -190,70 +197,74 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
   },[mode,instrument.id]);
   async function start(demo=false){await unlockAudio().catch(()=>{});setError('');setMode(demo?'demo':'live');if(demo){setLoading(false);reset();}}
   const expected=gestures.find(g=>g.id===melody[index]);
-  const status=mode==='demo'?'Демо без камеры':trackingPaused?'Пауза: верни руку в кадр':handPresent?'Кисть в кадре':'Ищем руку';
+  const status=mode==='demo'?t('s.st.demo'):trackingPaused?t('s.st.paused'):handPresent?t('s.st.hand'):t('s.st.search');
   const CoachIcon=guidance.tone==='success'?Check:guidance.tone==='warning'?CircleAlert:Lightbulb;
-  const coachKind=mode==='demo'?'Демо':guidance.tone==='success'?'Получилось':guidance.tone==='warning'?'Поправь':'Подсказка';
-  return <div className="session-sheet" role="dialog" aria-modal="true" aria-labelledby="session-title"><div className="session-inner">
+  const coachKind=mode==='demo'?t('s.kind.demo'):guidance.tone==='success'?t('s.kind.ok'):guidance.tone==='warning'?t('s.kind.fix'):t('s.kind.tip');
+  const hint=localizeHint(lang,guidance,{instrument:instrument.id,nextId:melody[index]});
+  const gname=(id?:string)=>id?t(`g.${id}.name`):'';
+  const feel=t(`s.feel.${instrument.id}`).split('|');
+  return <div className={`session-sheet ${lite?'lite':''}`} role="dialog" aria-modal="true" aria-labelledby="session-title"><div className="session-inner">
     <div className="session-top">
-      <div className="session-title"><h2 id="session-title">{instrument.name}<span> / {instrument.kazakh}</span></h2>{mode&&<span className="pill">{mode==='demo'?'Демо · без камеры':'С камерой'}</span>}</div>
-      <div className="session-tools"><button className="icon-button sound-button" aria-pressed={sound} onClick={toggleSound} aria-label={sound?'Выключить звук':'Включить звук'}>{sound?<Volume2 size={19}/>:<VolumeX size={19}/>}</button><button className="icon-button" onClick={close} aria-label="Закрыть"><X size={20}/></button></div>
+      <div className="session-title"><h2 id="session-title">{t(`inst.${instrument.id}.name`)}<span> / {t(`inst.${instrument.id}.alt`)}</span></h2>{mode&&<span className="pill">{mode==='demo'?t('s.pill.demo'):t('s.pill.live')}</span>}</div>
+      <div className="session-tools"><button className="icon-button sound-button" aria-pressed={sound} onClick={toggleSound} aria-label={sound?t('sound.off'):t('sound.on')}>{sound?<Volume2 size={19}/>:<VolumeX size={19}/>}</button><button className="icon-button" onClick={close} aria-label={t('s.close')}><X size={20}/></button></div>
     </div>
     {!mode?<div className="session-intro">
       <div className={`intro-art ${instrument.color}`}><InstrumentArt type={instrument.id}/></div>
       <div className="intro-content">
-        <h3>Почувствуй<br/>{instrument.id==='dombyra'?'движение струн.':instrument.id==='kobyz'?'ход смычка.':'силу ритма.'}</h3>
-        <p className="lead">{profile.setup}</p>
-        <div className="intro-gestures">{gestures.map(g=><div key={g.id}><span className="technique-symbol">{g.symbol}</span><div><b>{g.name}</b><small>{g.action}</small></div></div>)}</div>
-        <p className="intro-challenge">9 приёмов, 45 секунд, до 900 баллов</p>
+        <h3>{feel[0]}<br/>{feel[1]}</h3>
+        <p className="lead">{t(`setup.${instrument.id}`)}</p>
+        <div className="intro-gestures">{gestures.map(g=><div key={g.id}><span className="technique-symbol">{g.symbol}</span><div><b>{gname(g.id)}</b><small>{t(`g.${g.id}.action`)}</small></div></div>)}</div>
+        <p className="intro-challenge">{t('s.challenge')}</p>
         <div className="intro-cta">
-          <button className="button primary" onClick={()=>void start()}><Camera size={18}/> Включить камеру</button>
-          <button className="text-button" onClick={()=>void start(true)}>Попробовать демо без камеры</button>
+          <button className="button primary" onClick={()=>void start()}><Camera size={18}/> {t('s.camera')}</button>
+          <button className="text-button" onClick={()=>void start(true)}>{t('s.demoTry')}</button>
         </div>
-        <p className="privacy-note"><ShieldCheck size={15}/> Видео остаётся на устройстве. Инструмент поверх камеры можно скрыть.</p>
+        <p className="privacy-note"><ShieldCheck size={15}/> {t('s.privacy')}</p>
       </div>
     </div>:<div className="session-play">
       <div className="session-main">
         <div className="session-bar">
-          <div className="session-stats"><span><b>{seconds}</b> {trackingPaused?'пауза':'сек'}</span><span><b>{index}</b> из 9</span><span><b>{score}</b> баллов</span>{streak>=2&&<span className="streak" key={streak}>Серия ×{streak}</span>}</div>
-          <button className={`ar-toggle ${showAR?'is-on':''}`} aria-pressed={showAR} onClick={()=>setShowAR(!showAR)}>{showAR?<EyeOff size={16}/>:<Eye size={16}/>} {showAR?'Скрыть AR-инструмент':'Показать AR-инструмент'}</button>
+          <div className="session-stats"><span><b>{seconds}</b> {trackingPaused?t('s.paused'):t('s.sec')}</span><span><b>{index}</b> {t('s.of9')}</span><span><b>{score}</b> {t('s.points')}</span>{streak>=2&&<span className="streak" key={streak}>{t('s.streak',{n:streak})}</span>}</div>
+          <button className={`ar-toggle ${showAR?'is-on':''}`} aria-pressed={showAR} onClick={()=>setShowAR(!showAR)}>{showAR?<EyeOff size={16}/>:<Eye size={16}/>} {showAR?t('s.arHide'):t('s.arShow')}</button>
         </div>
+        {lite&&<div className="lite-note"><span>{t('lite.note')}</span><button className="text-button" onClick={()=>{autoLite.current=false;liteRef.current=false;lowRate.current=0;setLite(false);}}>{t('lite.restore')}</button></div>}
         <div ref={stage} className={`camera-stage motion-stage ${flash?'note-flash':''} ${miss?'note-miss':''}`} style={{aspectRatio:aspect}}>
           <div className="camera-viewport" style={{width:viewport.width||'100%',height:viewport.height||'100%'}}>
             {mode==='live'&&<><video ref={video} muted playsInline autoPlay onLoadedMetadata={e=>{const v=e.currentTarget;setAspect(v.videoWidth/v.videoHeight||4/3);}}/><canvas ref={canvas}/></>}
             {pops.map(p=><span key={p.id} className="score-pop" style={{left:`${p.x*100}%`,top:`${p.y*100}%`}}>+100</span>)}
-            {!loading&&!error&&<ARInstrument instrument={instrument.id} visible={showAR} point={contact} trace={trace} active={recognized} target={phase==='playing'||phase==='ready'?guidance.target:undefined} ready={mode==='live'&&phase==='ready'} progress={readyProgress}/>}
+            {!loading&&!error&&<ARInstrument instrument={instrument.id} visible={showAR&&!lite} point={contact} trace={trace} active={recognized} target={phase==='playing'||phase==='ready'?guidance.target:undefined} ready={mode==='live'&&phase==='ready'} progress={readyProgress}/>}
           </div>
           {!loading&&!error&&phase!=='done'&&<div className="camera-status"><span className={`live-dot ${handPresent||mode==='demo'?'':'muted'}`}/>{status}</div>}
-          {loading&&<div className="stage-overlay"><LoaderCircle className="spin" size={36}/><h3>Готовим твою сцену</h3><p>Запускаем камеру и распознавание движений…</p></div>}
-          {error&&<div className="stage-overlay"><Camera size={32}/><h3>Камере нужна помощь</h3><p>{error}</p><button className="button light" onClick={()=>{setMode(null);setPhase('intro');setError('');}}>Попробовать снова</button><button className="text-button light-text" onClick={()=>void start(true)}>Открыть демо</button></div>}
-          {!loading&&!error&&phase==='ready'&&(mode==='demo'?<div className="demo-ready"><p>Послушай приёмы и собери мелодию. В демо вместо движений работают кнопки.</p><button className="button light" onClick={()=>beginRef.current()}>Начать выступление</button></div>:<div className="motion-ready-label"><b>Совмести точку на кисти с меткой</b><span>Задержись на секунду — выступление начнётся само</span><div className="ready-meter"><i style={{'--p':readyProgress} as React.CSSProperties}/></div></div>)}
-          {phase==='done'&&<div className="stage-overlay result-overlay"><div className="trophy-circle"><Trophy size={30}/></div><span className="muted">{mode==='demo'?'Демо завершено':'Твоё выступление завершено'}</span><h3>{index===9?'Звучит как начало большого пути!':'Музыка начинается с практики'}</h3><div className="result-score">{score}<span> / 900 баллов</span></div><p>{index} из 9 приёмов, ошибок: {mistakes}</p><button className="button light" onClick={reset}><RotateCcw size={16}/> Сыграть ещё</button>{mode==='live'&&<small>Без кнопки: убери руку из кадра, затем покажи и задержи её на секунду</small>}<small>{saved?mode==='demo'?'Демо сохранено отдельно от настоящих выступлений':'Результат сохранён на этом устройстве':'Не удалось сохранить результат: память браузера недоступна'}</small></div>}
+          {loading&&<div className="stage-overlay"><LoaderCircle className="spin" size={36}/><h3>{t('s.loading.t')}</h3><p>{t('s.loading.d')}</p></div>}
+          {error&&<div className="stage-overlay"><Camera size={32}/><h3>{t('s.err.title')}</h3><p>{t('err.'+error)}</p><button className="button light" onClick={()=>{setMode(null);setPhase('intro');setError('');}}>{t('s.retry')}</button><button className="text-button light-text" onClick={()=>void start(true)}>{t('s.openDemo')}</button></div>}
+          {!loading&&!error&&phase==='ready'&&(mode==='demo'?<div className="demo-ready"><p>{t('s.demoReady')}</p><button className="button light" onClick={()=>beginRef.current()}>{t('s.start')}</button></div>:<div className="motion-ready-label"><b>{t('s.ready.t')}</b><span>{t('s.ready.d')}</span><div className="ready-meter"><i style={{'--p':readyProgress} as React.CSSProperties}/></div></div>)}
+          {phase==='done'&&<div className="stage-overlay result-overlay"><div className="trophy-circle"><Trophy size={30}/></div><span className="muted">{mode==='demo'?t('s.res.demo'):t('s.res.live')}</span><h3>{index===9?t('s.res.good'):t('s.res.ok')}</h3><div className="result-score">{score}<span> {t('s.res.of')}</span></div><p>{t('s.res.detail',{n:index,m:mistakes})}</p><button className="button light" onClick={reset}><RotateCcw size={16}/> {t('s.again')}</button>{mode==='live'&&<small>{t('s.hint')}</small>}<small>{saved?mode==='demo'?t('s.saved.demo'):t('s.saved.live'):t('s.saved.fail')}</small></div>}
         </div>
-        <div className="session-footer"><span><Maximize size={14}/> {showAR?'Играй в подсвеченной зоне':'AR скрыт, игровая зона остаётся на месте'}</span><span><ShieldCheck size={14}/> {mode==='live'&&calibrated?'Подстроено под руку · ':''}{mode==='live'&&trackingRate>0?`${trackingRate} кадр/с`:'Видео только на устройстве'}</span></div>
+        <div className="session-footer"><span><Maximize size={14}/> {showAR?t('s.foot.zone'):t('s.foot.arHidden')}</span><span><ShieldCheck size={14}/> {mode==='live'&&calibrated?t('s.foot.adapted'):''}{mode==='live'&&trackingRate>0?t('s.foot.fps',{n:trackingRate}):t('s.foot.video')}</span></div>
       </div>
       {phase!=='done'&&<aside className="session-side">
         <div className={`gesture-feedback coach-feedback ${guidance.tone==='success'?'success':guidance.tone==='warning'?'coach-warning':''}`} aria-live="polite" aria-atomic="true">
           <span className="coach-icon"><CoachIcon size={20}/></span>
           <div className="coach-text" key={mode==='demo'?'demo':guidance.code}>
             <span className="coach-kind">{coachKind}</span>
-            <b>{mode==='demo'?'Пробуем без камеры':guidance.title}</b>
-            <span>{mode==='demo'?'Выбирай карточки приёмов. С камерой те же звуки играются движением руки.':guidance.action}</span>
-            {mode==='live'&&trackingPaused&&<small>Таймер ждёт — за потерю руки баллы не снимаются.</small>}
+            <b>{mode==='demo'?t('s.demoTitle'):hint.title}</b>
+            <span>{mode==='demo'?t('s.demoText'):hint.action}</span>
+            {mode==='live'&&trackingPaused&&<small>{t('s.timerWaits')}</small>}
           </div>
         </div>
-        {phase==='playing'&&<div className="next-gesture"><span className="technique-symbol">{expected?.symbol}</span><div><small>Следующий приём</small><strong>{expected?.name}</strong></div></div>}
-        <p className="motion-instruction">{phase==='playing'?expected?.instruction:profile.setup}</p>
-        <div className="gesture-controls">{gestures.map(g=><button key={g.id} disabled={mode!=='demo'||phase!=='playing'} className={`gesture-control ${phase==='playing'&&g.id===melody[index]?'expected':''} ${recognized===g.id?'detected':''}`} onClick={()=>action.current(g.id)} title={g.instruction}><span className="technique-symbol">{g.symbol}</span><b>{g.name}</b><small>{g.action}</small>{recognized===g.id&&<Check size={16}/>}</button>)}</div>
-        <div className="melody-track" aria-label={`Мелодия: ${index} из 9`}>{melody.map((g,i)=><span key={i} className={i<index?'complete':i===index?'current':''}>{i<index?<Check size={14}/>:gestures.find(x=>x.id===g)?.symbol}</span>)}</div>
+        {phase==='playing'&&<div className="next-gesture"><span className="technique-symbol">{expected?.symbol}</span><div><small>{t('s.next')}</small><strong>{gname(expected?.id)}</strong></div></div>}
+        <p className="motion-instruction">{phase==='playing'&&expected?t(`g.${expected.id}.instruction`):t(`setup.${instrument.id}`)}</p>
+        <div className="gesture-controls">{gestures.map(g=><button key={g.id} disabled={mode!=='demo'||phase!=='playing'} className={`gesture-control ${phase==='playing'&&g.id===melody[index]?'expected':''} ${recognized===g.id?'detected':''}`} onClick={()=>action.current(g.id)} title={t(`g.${g.id}.instruction`)}><span className="technique-symbol">{g.symbol}</span><b>{gname(g.id)}</b><small>{t(`g.${g.id}.action`)}</small>{recognized===g.id&&<Check size={16}/>}</button>)}</div>
+        <div className="melody-track" aria-label={t('s.melody',{n:index})}>{melody.map((g,i)=><span key={i} className={i<index?'complete':i===index?'current':''}>{i<index?<Check size={14}/>:gestures.find(x=>x.id===g)?.symbol}</span>)}</div>
       </aside>}
-      {phase==='done'&&summary&&<aside className="session-side"><section className="summary" aria-label="Разбор выступления">
-        <h3 className="summary-title">{summary.record?'Новый рекорд':mode==='demo'?'Разбор демо':'Разбор выступления'}</h3>
-        {summary.rank>0&&!summary.record&&<p className="muted">Это {summary.rank}-й результат на этом инструменте.</p>}
-        <div className="summary-stats"><div><b>{summary.accuracy}%</b><span>точность</span></div><div><b>{summary.seconds}</b><span>сек</span></div><div><b>×{summary.bestStreak}</b><span>лучшая серия</span></div></div>
-        {summary.tips.length>0?<div className="summary-block"><h4>Что поправить</h4>{summary.tips.map(t=><div className="hint" key={t.title}><Lightbulb size={18}/><b>{t.title}</b><span>{t.action}</span></div>)}</div>
-          :<p className="summary-clean">Техника чистая: подсказки не понадобились.</p>}
-        {summary.weak.length>0&&<div className="summary-block"><h4>Чаще всего не выходило</h4><ul className="weak-list">{summary.weak.map(w=><li key={w.name}><span>{w.name}</span><b>×{w.count}</b></li>)}</ul></div>}
-        {mode==='live'&&summary.board.length>0&&<div className="summary-block"><h4>Твои лучшие</h4><ol className="rank-list">{summary.board.map((p,i)=><li key={p.id} className={`rank-row ${p.id===summary.currentId?'is-current':''}`}><span className="rank-n">{i+1}</span><span>{new Date(p.date).toLocaleDateString('ru-RU',{day:'numeric',month:'short'})}</span><strong>{p.score}</strong></li>)}</ol></div>}
+      {phase==='done'&&summary&&<aside className="session-side"><section className="summary" aria-label={t('sum.title')}>
+        <h3 className="summary-title">{summary.record?t('sum.record'):mode==='demo'?t('sum.demo'):t('sum.title')}</h3>
+        {summary.rank>0&&!summary.record&&<p className="muted">{t('sum.rank',{n:summary.rank})}</p>}
+        <div className="summary-stats"><div><b>{summary.accuracy}%</b><span>{t('sum.accuracy')}</span></div><div><b>{summary.seconds}</b><span>{t('sum.sec')}</span></div><div><b>×{summary.bestStreak}</b><span>{t('sum.streak')}</span></div></div>
+        {summary.tips.length>0?<div className="summary-block"><h4>{t('sum.fix')}</h4>{summary.tips.map(tip=><div className="hint" key={tip.title}><Lightbulb size={18}/><b>{tip.title}</b><span>{tip.action}</span></div>)}</div>
+          :<p className="summary-clean">{t('sum.clean')}</p>}
+        {summary.weak.length>0&&<div className="summary-block"><h4>{t('sum.weak')}</h4><ul className="weak-list">{summary.weak.map(w=><li key={w.id}><span>{gname(w.id)}</span><b>×{w.count}</b></li>)}</ul></div>}
+        {mode==='live'&&summary.board.length>0&&<div className="summary-block"><h4>{t('sum.best')}</h4><ol className="rank-list">{summary.board.map((p,i)=><li key={p.id} className={`rank-row ${p.id===summary.currentId?'is-current':''}`}><span className="rank-n">{i+1}</span><span>{new Date(p.date).toLocaleDateString(locales[lang],{day:'numeric',month:'short'})}</span><strong>{p.score}</strong></li>)}</ol></div>}
       </section></aside>}
     </div>}
   </div></div>;
