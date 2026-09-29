@@ -1,8 +1,8 @@
 import { coach, type CoachHint } from './coaching';
 /** All coordinates are normalized to the mirrored camera image, as seen by the player. */
 export type Point = { x: number; y: number; z?: number };
-export type InstrumentId = 'dombyra' | 'kobyz' | 'dauylpaz';
-export type Gesture = 'strum-down' | 'strum-up' | 'pluck' | 'bow-right' | 'bow-left' | 'bow-short' | 'drum-center' | 'drum-rim' | 'drum-double';
+export type InstrumentId = 'dombyra' | 'kobyz' | 'dauylpaz' | 'zhetygen';
+export type Gesture = 'strum-down' | 'strum-up' | 'pluck' | 'bow-right' | 'bow-left' | 'bow-short' | 'drum-center' | 'drum-rim' | 'drum-double' | `string-${1|2|3|4|5|6|7}`;
 export type Technique = { id: Gesture; name: string; symbol: string; action: string; instruction: string };
 export type InstrumentProfile = { id: InstrumentId; gestures: Technique[]; ready: Point; setup: string };
 const profiles: Record<InstrumentId, InstrumentProfile> = {
@@ -21,9 +21,11 @@ const profiles: Record<InstrumentId, InstrumentProfile> = {
     { id: 'drum-rim', name: 'Удар по краю', symbol: '◉', action: 'Звонкий удар', instruction: 'Наведи точку на левый или правый край. Ударь вниз, через линию барабана.' },
     { id: 'drum-double', name: 'Двойной удар', symbol: '⇊', action: 'Два удара подряд', instruction: 'Два раза подряд ударь вниз. Между ударами обязательно подними точку выше линии барабана.' },
   ]},
+  zhetygen: { id: 'zhetygen', ready: { x: .50, y: .62 }, setup: 'Направь камеру на стол и положи на него руку. Приподними палец и коснись стола над нужной струной — она зазвучит.',
+    gestures: ['соль','ля','до','ре','ми','соль','ля'].map((note, i) => ({ id: `string-${i+1}` as Gesture, name: `Струна ${i+1}`, symbol: String(i+1), action: `Нота ${note}`, instruction: `Подними палец над ${i+1}-й струной и коснись стола.` })) },
 };
 export function getProfile(instrument: string): InstrumentProfile { return profiles[instrument as InstrumentId] ?? profiles.dombyra; }
-export function getMelody(instrument: string): Gesture[] { const g = getProfile(instrument).gestures; return [0,1,2,0,2,1,0,1,2].map(i => g[i].id); }
+export function getMelody(instrument: string): Gesture[] { const g = getProfile(instrument).gestures; return (instrument==='zhetygen'?[0,2,4,5,4,2,3,1,0]:[0,1,2,0,2,1,0,1,2]).map(i => g[i].id); }
 export const distance = (a: Point, b: Point) => Math.hypot(a.x-b.x, a.y-b.y);
 const clamp = (n: number, low: number, high: number) => Math.max(low, Math.min(high, n));
 const median = (values: number[]) => [...values].sort((a,b)=>a-b)[Math.floor(values.length/2)] ?? 0;
@@ -40,18 +42,35 @@ export function handQuality(points: Point[]): string | null {
 export function inPlayingZone(id: string, p: Point) {
   if (id==='kobyz') return p.x>=.14&&p.x<=.86&&Math.abs(p.y-.56)<=.14;
   if (id==='dauylpaz') return p.x>=.21&&p.x<=.79&&p.y>=.20&&p.y<=.91;
+  if (id==='zhetygen') return p.x>=.10&&p.x<=.90&&p.y>=.35&&p.y<=.98;
   return p.x>=.40&&p.x<=.90&&p.y>=.20&&p.y<=.94;
 }
 export type MotionEvent = { gesture: Gesture; strength: number };
 export type MotionResult = { event: MotionEvent | null; events: MotionEvent[]; impacts: MotionEvent[]; hint: string; coach: CoachHint; inZone: boolean; point: Point | null; trace: Point[]; bowSpeed: number; recovering: boolean };
-type Sample = Point & { time: number; scale: number; pinch: number | null };
+type Sample = Point & { time: number; scale: number; pinch: number | null; fingers?: Finger[] };
 type BowSegment = { from: Sample; end: Sample; direction: number; emitted: boolean; lastMove: number; minY: number; maxY: number };
-export type Calibration = { scale: number; noise: number };
+/**
+ * Zhetygen: a fingertip in the palm's own frame (wrist→middle knuckle axis, palm-length units), so moving
+ * or turning the whole hand changes nothing. Lifting a finger off the table moves the tip away from its
+ * resting place in this frame from any camera angle; touching the table brings it back.
+ */
+type Finger = { tip: Point; offset: Point };
+export function fingerPose(points: Point[]): Finger[] {
+  const s=distance(points[0],points[9]);const ux=(points[9].x-points[0].x)/s,uy=(points[9].y-points[0].y)/s;
+  return [5,9,13,17].map(base=>{const tip=points[base+3];const dx=tip.x-points[base].x,dy=tip.y-points[base].y;return {tip,offset:{x:(dx*ux+dy*uy)/s,y:(dy*ux-dx*uy)/s}};});
+}
+// ponytail: fixed thresholds in palm units, tuned on synthetic hands only — adjust on a real table and camera.
+const LIFT=.22, CONTACT=.10;
+/** Seven strings across the table, string 1 on the left. */
+export const stringX=(n: number)=>.2+(n-1)*.1;
+const stringAt=(tip: Point)=>{const i=Math.round((tip.x-.2)*10);return i>=0&&i<7&&tip.y>=.3&&tip.y<=.97?i+1:0;};
+export type Calibration = { scale: number; noise: number; rest?: Point[] };
 export function calibrateHand(frames: Point[][]): Calibration {
   const usable=frames.filter(p=>!handQuality(p));
   if(usable.length<5)return {scale:.12,noise:.002};
-  const centers=usable.map(palmPoint);
-  return {scale:clamp(median(usable.map(p=>distance(p[0],p[9]))),.06,.23),noise:clamp(median(centers.slice(1).map((p,i)=>distance(p,centers[i]))),.001,.012)};
+  const centers=usable.map(palmPoint);const poses=usable.map(fingerPose);
+  return {scale:clamp(median(usable.map(p=>distance(p[0],p[9]))),.06,.23),noise:clamp(median(centers.slice(1).map((p,i)=>distance(p,centers[i]))),.001,.012),
+    rest:poses[0].map((_,i)=>({x:median(poses.map(f=>f[i].offset.x)),y:median(poses.map(f=>f[i].offset.y))}))};
 }
 export function selectHand(hands: Point[][], anchor: Point): Point[] {
   return hands.filter(p=>p.length===21).sort((a,b)=>distance(palmPoint(a),anchor)-distance(palmPoint(b),anchor))[0] ?? [];
@@ -71,10 +90,13 @@ export class MotionRecognizer {
   private drumPending: { gesture: Gesture; time: number; strength: number } | null = null;
   private lastEvent = -Infinity;
   private calibration: Calibration = { scale:.12, noise:.002 };
+  /** Resting fingertip offsets belong to the hand, not to one movement, so reset() keeps them. */
+  private rest: Point[] | null = null;
+  private lifted: ({ time: number; peak: number } | null)[] = [null,null,null,null];
   constructor(instrument: string) { this.profile=getProfile(instrument); }
-  calibrate(frames: Point[][]) { this.calibration=calibrateHand(frames); }
+  calibrate(frames: Point[][]) { this.calibration=calibrateHand(frames);this.rest=this.calibration.rest??this.rest; }
   reset() {
-    this.previous=null;this.beforePrevious=null;this.history=[];this.above=null;this.below=null;this.pinch=null;this.bow=null;this.pendingJump=null;this.missing=false;this.drumPending=null;this.lastEvent=-Infinity;
+    this.previous=null;this.beforePrevious=null;this.history=[];this.above=null;this.below=null;this.pinch=null;this.bow=null;this.pendingJump=null;this.missing=false;this.drumPending=null;this.lastEvent=-Infinity;this.lifted=[null,null,null,null];
   }
   private resetPath() { const pending=this.drumPending;const last=this.lastEvent;this.reset();this.drumPending=pending;this.lastEvent=last; }
   private base(expected?: Gesture): MotionResult {
@@ -102,7 +124,7 @@ export class MotionRecognizer {
     const center=palmPoint(points);const scale=distance(points[0],points[9]);
     const tips=[points[4],points[8]];
     const pinch=tips.every(p=>Number.isFinite(p.x)&&Number.isFinite(p.y)&&p.x>.005&&p.x<.995&&p.y>.005&&p.y<.995)?distance(tips[0],tips[1])/scale:null;
-    const p: Sample={...center,time:now,scale,pinch};r.point=p;r.inZone=inPlayingZone(this.profile.id,p);
+    const p: Sample={...center,time:now,scale,pinch,fingers:this.profile.id==='zhetygen'?fingerPose(points):undefined};r.point=p;r.inZone=inPlayingZone(this.profile.id,p);
     const prev=this.previous;
     if(prev){
       if(now<=prev.time)return r;
@@ -140,8 +162,7 @@ export class MotionRecognizer {
     return r;
   }
   private reposition(p: Point): CoachHint {
-    const id=this.profile.id;const left=id==='dombyra'?.43:id==='kobyz'?.17:.23;const right=id==='dombyra'?.87:id==='kobyz'?.83:.77;
-    const y=id==='kobyz'?.56:.52;const noun=id==='kobyz'?'дорожке смычка':id==='dombyra'?'струнам':'барабану';
+    const [left,right,y,noun]=({dombyra:[.43,.87,.52,'струнам'],kobyz:[.17,.83,.56,'дорожке смычка'],dauylpaz:[.23,.77,.52,'барабану'],zhetygen:[.16,.84,.62,'струнам жетыгена']} as const)[this.profile.id];
     if(p.x<left)return coach('move-right','Рука слишком слева',`Сдвинь кисть вправо, к ${noun}.`,{x:left+.06,y},'warning');
     if(p.x>right)return coach('move-left','Рука слишком справа',`Сдвинь кисть влево, к ${noun}.`,{x:right-.06,y},'warning');
     return coach(p.y<y?'move-down':'move-up',p.y<y?'Рука слишком высоко':'Рука слишком низко',p.y<y?`Опусти кисть к ${noun}.`:`Подними кисть к ${noun}.`,{x:clamp(p.x,left+.03,right-.03),y},'warning');
@@ -219,6 +240,29 @@ export class MotionRecognizer {
           if(!r.events.length&&expected==='bow-short')this.setTip(r,coach('short-bow','Небольшой штрих — и стоп','Сдвинь руку вбок совсем немного. Затем остановись или поверни обратно.',{x:clamp(p.x+(p.x>.65?-.07:.07),.18,.82),y:.56}));
           else if(!r.events.length){const right=expected!=='bow-left';this.setTip(r,coach(right?'bow-right':'bow-left',right?'Веди руку вправо':'Веди руку влево','Не останавливайся до жёлтой метки. Высоту руки сохраняй.',{x:clamp(p.x+(right?long:-long),.17,.83),y:.56}));}
         }
+      }
+    }else if(id==='zhetygen'){
+      r.trace=[];const fingers=p.fingers!;const rest=this.rest??=fingers.map(f=>f.offset);let press:{finger:number;peak:number}|null=null;
+      for(const [i,f] of fingers.entries()){
+        const lift=distance(f.offset,rest[i]);const up=this.lifted[i];
+        if(up){
+          up.peak=Math.max(up.peak,lift);
+          if(lift<CONTACT){if(!press||up.peak>press.peak)press={finger:i,peak:up.peak};this.lifted[i]=null;}
+          // A finger that never comes back has a new resting pose rather than a very long lift.
+          else if(p.time-up.time>1500){rest[i]=f.offset;this.lifted[i]=null;}
+        }else if(lift>LIFT)this.lifted[i]={time:p.time,peak:lift};
+        else if(lift<CONTACT)rest[i]={x:rest[i].x+(f.offset.x-rest[i].x)*.08,y:rest[i].y+(f.offset.y-rest[i].y)*.08};
+      }
+      const raised=this.lifted.findIndex(Boolean);r.point=fingers[raised<0?0:raised].tip;
+      const want=Number(expected?.slice(7))||0;const target=want?{x:stringX(want),y:.62}:undefined;
+      if(press){
+        const n=stringAt(fingers[press.finger].tip);r.point=fingers[press.finger].tip;
+        if(!n)this.setTip(r,coach('tap-off-strings','Касание мимо струн','Касайся стола внутри подсвеченной рамки.',target,'warning'));
+        else if(p.time-this.lastEvent>60)this.emit(r,{gesture:`string-${n}` as Gesture,strength:clamp(press.peak/.6,.35,1)},p.time);
+      }else if(zone){
+        if(raised>=0)this.setTip(r,coach('tap-press','Теперь коснись стола','Опусти палец на струну.',target));
+        else if(target&&!fingers.some(f=>Math.abs(f.tip.x-target.x)<.06))this.setTip(r,coach('tap-to-string',`Нужна ${this.profile.gestures[want-1].name.toLowerCase()}`,'Поднеси палец к жёлтой метке и коснись стола.',target,'warning'));
+        else this.setTip(r,coach('tap-lift','Подними палец','Затем коснись стола над струной — она зазвучит.',target));
       }
     }else{
       if(p.x>=.21&&p.x<=.79&&p.y<.6-Math.max(.045,amplitude*.75))this.above=p;
