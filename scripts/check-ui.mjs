@@ -94,13 +94,13 @@ await denied.getByText('Доступ к камере закрыт.',{exact:false
 await denied.getByRole('button',{name:'Открыть демо',exact:true}).click();
 await denied.getByRole('button',{name:'Начать выступление',exact:true}).waitFor();
 await denied.close();
-for(const [id,names] of [['kobyz',['Смычок вправо','Смычок влево','Короткий штрих']],['dauylpaz',['Удар в центр','Удар по краю','Двойной удар']]]){
+for(const id of ['kobyz','dauylpaz','zhetygen']){
   const demo=await browser.newPage({locale:'ru-RU',viewport:{width:390,height:844},reducedMotion:'reduce'});
   await demo.goto(`${baseURL}/?instrument=${id}`);
   await demo.getByRole('button',{name:'Попробовать демо без камеры'}).click();
   await demo.getByRole('button',{name:'Начать выступление',exact:true}).click();
   await demo.screenshot({path:`artifacts/ar-${id}-mobile.png`});
-  for(const i of [0,1,2,0,2,1,0,1,2])await demo.locator('.gesture-control').filter({hasText:names[i]}).click();
+  for(let i=0;i<9;i++)await demo.locator('.gesture-control.expected').click();
   await demo.getByText('Демо завершено',{exact:true}).waitFor();
   if(!(await demo.locator('.result-score').innerText()).startsWith('900'))throw Error(`${id} score failed`);
   await demo.close();
@@ -149,7 +149,19 @@ await motion.getByText('Следующий приём',{exact:true}).waitFor();
 await motion.reload();await motion.getByRole('button',{name:'Попробовать демо без камеры'}).click();
 await motion.getByRole('button',{name:'Показать AR-инструмент'}).waitFor();
 await motion.close();
-console.log(JSON.stringify({passed:['desktop render','filters','QR','demo final and scoring','persistence','timeout and replay','permission denied and demo fallback','QR deep link','MediaPipe camera initialization','mobile width','mobile navigation','all instrument scenarios','AR toggle and persistence','AR/video alignment','hands-free start and real motion event integration','hidden AR keeps recognizing','hands-free 9-note result and replay','directional error and AR arrow','timer pauses on tracking loss'],errors}));
+// Zhetygen: a hand resting on the table starts the session; lifting the index finger and putting it down plays the string under it.
+const table=await browser.newPage({locale:'ru-RU',viewport:{width:1100,height:950},reducedMotion:'reduce'});
+await table.route(/@mediapipe_tasks-vision\.js/,route=>route.fulfill({contentType:'text/javascript',body:`export const FilesetResolver={forVisionTasks:async()=>({})};export const HandLandmarker={createFromOptions:async()=>({detectForVideo:()=>({landmarks:window.__landmarks?[window.__landmarks]:[]}),close:()=>{}})};`}));
+await table.goto(`${baseURL}/?instrument=zhetygen`);
+await table.getByRole('button',{name:'Включить камеру',exact:true}).click();
+async function rest(x,lifted=-1){await table.evaluate(({x,lifted})=>{const y=.62,p=Array.from({length:21},()=>({x:1-x,y,z:0}));p[0]={x:1-x,y:y+.15,z:0};[5,9,13,17].forEach((b,i)=>{p[b]={x:1-(x-.045+i*.03),y,z:0};p[b+3]={x:1-(x-.045+i*.03),y:y-(i===lifted?.04:.09),z:0};});window.__landmarks=p;},{x,lifted});await table.waitForTimeout(150);}
+await rest(.5);await table.getByText('Следующий приём',{exact:true}).waitFor();
+await rest(.245);await rest(.245,0);await rest(.245);
+await table.locator('.gesture-control.expected').filter({hasText:'Струна 3'}).waitFor();
+if(!(await table.locator('.session-stats').innerText()).includes('100'))throw Error('zhetygen table tap did not score');
+await table.screenshot({path:'artifacts/ar-zhetygen-live.png'});
+await table.close();
+console.log(JSON.stringify({passed:['desktop render','filters','QR','demo final and scoring','persistence','timeout and replay','permission denied and demo fallback','QR deep link','MediaPipe camera initialization','mobile width','mobile navigation','all instrument scenarios','AR toggle and persistence','AR/video alignment','hands-free start and real motion event integration','zhetygen table tap','hidden AR keeps recognizing','hands-free 9-note result and replay','directional error and AR arrow','timer pauses on tracking loss'],errors}));
 if(errors.length)process.exitCode=1;
 } finally {
   await browser?.close();
