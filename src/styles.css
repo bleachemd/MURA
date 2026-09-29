@@ -76,3 +76,4 @@
 @media(max-width:520px){
   .page-content{padding-left:max(19px,env(safe-area-inset-left));padding-right:max(19px,env(safe-area-inset-right))}
 }
+.sky{background:#e3eaea}.motion-stage .camera-viewport video.unmirrored{transform:none}.gesture-controls:has(>:nth-child(4)){grid-template-columns:repeat(4,1fr)}

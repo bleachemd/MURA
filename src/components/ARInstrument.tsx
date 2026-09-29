@@ -1,5 +1,5 @@
 import { useId } from 'react';
-import { getProfile, type Gesture, type Point } from '../lib/gestures';
+import { getProfile, stringX, type Gesture, type Point } from '../lib/gestures';
 import { useI18n } from '../i18n';
 type Props = { instrument: string; visible: boolean; point: Point | null; trace: Point[]; active: Gesture | null; ready: boolean; progress: number; target?: Point };
 /** Camera-aligned 2D AR: geometry and detector share the same mirrored normalized frame. */
@@ -19,6 +19,12 @@ export function ARInstrument({instrument,visible,point,trace,active,ready,progre
         <ellipse cx="635" cy="450" rx="19" ry="26" fill="#463622"/><path d="M770 418V485" stroke="#634322" strokeWidth="8"/>
         {[444,456].map(y=><path key={y} className="ar-string" d={`M82 ${y}H790`} stroke={ink} strokeWidth={lit?4:2}/>)}
         <path d="M574 523q18-22 36 0q-18 22-36 0M703 523q18-22 36 0q-18 22-36 0" stroke="#9d7946" strokeWidth="3" fill="none"/>
+      </> : instrument==='zhetygen' ? <>
+        <path d="M150 318Q142 298 166 296H834Q858 298 850 318L862 700Q864 724 838 724H162Q136 724 138 700Z" fill={`url(#${id}wood)`} stroke="#edd5a3" strokeWidth="3"/>
+        <path d="M174 326H826L836 694H164Z" fill={`url(#${id}skin)`} stroke="#8d6139" strokeWidth="3"/>
+        <path d="M170 340H830M160 680H840" stroke="#634322" strokeWidth="8"/>
+        {Array.from({length:7},(_,i)=><path key={`a${i}`} d={`M${stringX(i+1)*1000-14} ${640-i*42}h28l-6 13h-16Z`} fill="#f3e6c8" stroke="#8d6139" strokeWidth="2"/>)}
+        {Array.from({length:7},(_,i)=>{const on=active===`string-${i+1}`;return <path key={i} className="ar-string" d={`M${stringX(i+1)*1000} 334V686`} stroke={on?'#7ff0e6':'#f2e9d6'} strokeWidth={on?5:2}/>;})}
       </> : instrument==='kobyz' ? <>
         <path d="M483 150Q455 109 487 90Q527 83 523 126L518 442Q588 469 594 574Q596 684 501 696Q407 679 404 583Q404 479 482 442Z" fill={`url(#${id}wood)`} stroke="#deb980" strokeWidth="3"/>
         <path d="M445 503Q467 467 500 492Q533 466 556 505L565 579Q500 602 433 579Z" fill="#392d22"/>
@@ -35,7 +41,7 @@ export function ARInstrument({instrument,visible,point,trace,active,ready,progre
       </>}
     </g>}
     <g className="ar-guides" fill="none" stroke={ink} strokeWidth="2">
-      {instrument==='dombyra' ? <><rect x="430" y="298" width="440" height="305" rx="35" strokeDasharray="8 11" opacity=".25"/><path d="M450 450H850" strokeWidth="3" strokeDasharray={visible?'0':'10 8'}/><path d="M710 370v150m-14-132 14-18 14 18m-28 114 14 18 14-18" opacity=".7"/><text x="430" y="640">{t('ar.strings')}</text></> : instrument==='kobyz' ? <><rect x="140" y="315" width="720" height="210" rx="28" strokeDasharray="10 10" opacity=".6"/><path d="M200 420H800M220 403l-20 17 20 17m560-34 20 17-20 17" opacity=".65"/><text x="175" y="530">{t('ar.bow')}</text></> : <><path d="M230 450H770" strokeDasharray="10 8"/><ellipse cx="500" cy="455" rx="110" ry="38" strokeWidth={active==='drum-center'?5:2}/><path d="M253 450q15-46 100-62m394 62q-15-46-100-62" strokeWidth={active==='drum-rim'?6:3}/><text x="468" y="521">{t('ar.center')}</text><text x="253" y="361">{t('ar.rim')}</text><text x="691" y="361">{t('ar.rim')}</text></>}
+      {instrument==='zhetygen' ? <><rect x="140" y="296" width="720" height="428" rx="24" strokeDasharray="8 11" opacity=".3"/>{Array.from({length:7},(_,i)=><text key={i} x={stringX(i+1)*1000} y="284" textAnchor="middle" style={{letterSpacing:0}}>{i+1}</text>)}<text x="140" y="256">{t('ar.table')}</text></> : instrument==='dombyra' ? <><rect x="430" y="298" width="440" height="305" rx="35" strokeDasharray="8 11" opacity=".25"/><path d="M450 450H850" strokeWidth="3" strokeDasharray={visible?'0':'10 8'}/><path d="M710 370v150m-14-132 14-18 14 18m-28 114 14 18 14-18" opacity=".7"/><text x="430" y="640">{t('ar.strings')}</text></> : instrument==='kobyz' ? <><rect x="140" y="315" width="720" height="210" rx="28" strokeDasharray="10 10" opacity=".6"/><path d="M200 420H800M220 403l-20 17 20 17m560-34 20 17-20 17" opacity=".65"/><text x="175" y="530">{t('ar.bow')}</text></> : <><path d="M230 450H770" strokeDasharray="10 8"/><ellipse cx="500" cy="455" rx="110" ry="38" strokeWidth={active==='drum-center'?5:2}/><path d="M253 450q15-46 100-62m394 62q-15-46-100-62" strokeWidth={active==='drum-rim'?6:3}/><text x="468" y="521">{t('ar.center')}</text><text x="253" y="361">{t('ar.rim')}</text><text x="691" y="361">{t('ar.rim')}</text></>}
     </g>
     {target && !ready && !lit && <g className="ar-coach-target"><circle cx={target.x*1000} cy={target.y*750} r="27" fill="#e6ac3c26" stroke="#e6ac3c" strokeWidth="3" strokeDasharray="6 5"/><circle cx={target.x*1000} cy={target.y*750} r="5" fill="#e6ac3c"/>{point&&Math.hypot(point.x-target.x,point.y-target.y)>.06&&<path d={`M${point.x*1000} ${point.y*750}L${(point.x+(target.x-point.x)*.76)*1000} ${(point.y+(target.y-point.y)*.76)*750}`} stroke="#e6ac3c" strokeWidth="3" strokeDasharray="7 5" markerEnd={`url(#${id}arrow)`}/>}</g>}
     {trace.length>1 && <polyline points={trace.map(p=>`${p.x*1000},${p.y*750}`).join(' ')} fill="none" stroke={ink} strokeWidth="5" strokeLinecap="round" strokeLinejoin="round" opacity=".55"/>}

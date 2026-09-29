@@ -31,6 +31,8 @@ export function updateBow(speed: number) {
   bow.filter.frequency.setTargetAtTime(700+Math.min(speed,1.4)*700,ctx.currentTime,.07);
   bow.gain.gain.setTargetAtTime(.025+Math.min(speed,1.4)*.05,ctx.currentTime,.035);
 }
+/** Seven strings tuned to a pentatonic scale: G3 A3 C4 D4 E4 G4 A4. */
+const zhetygenTuning=[196,220,261.63,293.66,329.63,392,440];
 export function playNote(gesture: Gesture, instrument = 'dombyra', strength=.7) {
   if(!enabled || !context || context.state!=='running')return;
   const ctx=context;const now=ctx.currentTime;const volume=.12+Math.min(1,Math.max(0,strength))*.14;
@@ -50,7 +52,8 @@ export function playNote(gesture: Gesture, instrument = 'dombyra', strength=.7) 
     const filter=ctx.createBiquadFilter();filter.frequency.value=gesture==='bow-left'?1050:1250;
     const gain=ctx.createGain();gain.gain.setValueAtTime(.001,now);gain.gain.exponentialRampToValueAtTime(volume*.4,now+.05);gain.gain.exponentialRampToValueAtTime(.001,now+duration);
     osc.connect(filter);filter.connect(gain);gain.connect(ctx.destination);osc.start();osc.stop(now+duration);osc.onended=()=>{osc.disconnect();filter.disconnect();gain.disconnect();};
-  } else if(gesture==='pluck')pluck(293.66,0,1);
+  } else if(instrument==='zhetygen')pluck(zhetygenTuning[Number(gesture.slice(7))-1]??293.66,0,1);
+  else if(gesture==='pluck')pluck(293.66,0,1);
   else {const notes=gesture==='strum-up'?[220,146.83]:[146.83,220];pluck(notes[0],0,.8);pluck(notes[1],.022,.8);}
 }
 export type Cue = 'good' | 'miss' | 'start' | 'finish' | 'record';

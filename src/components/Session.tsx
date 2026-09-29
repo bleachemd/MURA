@@ -31,7 +31,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
   // Lite mode: when the camera loop starves, cut UI painting (not recognition) so the main thread can keep up.
   const [lite,setLite]=useState(false);const liteRef=useRef(false);const lowRate=useRef(0);const autoLite=useRef(true);
   const [showAR,setShowAR]=useState(()=>{try{return localStorage.getItem('mura-show-ar')!=='false';}catch{return true;}});
-  const [aspect,setAspect]=useState(4/3);const [viewport,setViewport]=useState({width:0,height:0});
+  const [aspect,setAspect]=useState(4/3);const [mirror,setMirror]=useState(true);const [viewport,setViewport]=useState({width:0,height:0});
   const stage=useRef<HTMLDivElement>(null);const video=useRef<HTMLVideoElement>(null);const canvas=useRef<HTMLCanvasElement>(null);
   const detector=useRef(new MotionRecognizer(instrument.id));
   const state=useRef({phase,index,mistakes,mode,start:0,finished:0});
@@ -83,7 +83,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
   };
   action.current=(g,strength=.7)=>{
     const s=state.current;if(s.phase!=='playing')return;
-    if(s.mode==='demo'||instrument.id==='dombyra')playNote(g,instrument.id,strength);
+    if(s.mode==='demo'||instrument.id==='dombyra'||instrument.id==='zhetygen')playNote(g,instrument.id,strength);
     setRecognized(g);clearTimeout(noteTimeout.current);noteTimeout.current=setTimeout(()=>setRecognized(null),700);
     if(g===melody[s.index]){
       s.index++;setIndex(s.index);celebrate();setFlash(true);clearTimeout(flashTimeout.current);flashTimeout.current=setTimeout(()=>setFlash(false),350);publish.current(coach('success','Получилось! +100', 'Теперь: '+(gestures.find(t=>t.id===melody[s.index])?.name??'выступление завершено')+'.',undefined,'success'),performance.now(),true);
@@ -109,7 +109,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
   },[mode,aspect]);
   useEffect(()=>{
     if(mode!=='live')return;
-    let cancelled=false;let stream:MediaStream|undefined;let model:HandLandmarker|undefined;let frame=0;let previousFrame=-1;let lastTime=0;let lastPaint=0;let rateStart=performance.now();let workMs=0;let delegate:'GPU'|'CPU'='GPU';let swapping=false;let makeModel:((d:'GPU'|'CPU')=>Promise<HandLandmarker>)|undefined;let processed=0;let anchor:Point=profile.ready;let videoCallback=false;let starved=0;let degenerate=0;
+    let cancelled=false;let stream:MediaStream|undefined;let model:HandLandmarker|undefined;let frame=0;let previousFrame=-1;let lastTime=0;let lastPaint=0;let rateStart=performance.now();let workMs=0;let delegate:'GPU'|'CPU'='GPU';let swapping=false;let makeModel:((d:'GPU'|'CPU')=>Promise<HandLandmarker>)|undefined;let processed=0;let anchor:Point=profile.ready;let videoCallback=false;let starved=0;let degenerate=0;let mirrored=true;
     const draw=(points:Point[],valid:boolean)=>{
       const c=canvas.current;const v=video.current;if(!c||!v)return;
       if(c.width!==(v.videoWidth||640))c.width=v.videoWidth||640;if(c.height!==(v.videoHeight||480))c.height=v.videoHeight||480;const ctx=c.getContext('2d');if(!ctx)return;
@@ -133,7 +133,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
         degenerate=0;
         previousFrame=v.currentTime;lastTime=now;const workStart=performance.now();
         try{
-          const all=model.detectForVideo(v,now).landmarks.map(hand=>hand.map(p=>({...p,x:1-p.x})));
+          const all=model.detectForVideo(v,now).landmarks.map(hand=>hand.map(p=>({...p,x:mirrored?1-p.x:p.x})));
           const points=selectHand(all,anchor);const quality=handQuality(points);const s=state.current;
           const center=quality?null:palmPoint(points);if(center)anchor=center;
           const paint=now-lastPaint>=(liteRef.current?120:60);processed++;
@@ -193,13 +193,17 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
       try{
         if(!window.isSecureContext||!navigator.mediaDevices?.getUserMedia)throw new Error('secure');
         // Some webcams (older Logitech models, virtual cameras) refuse a detailed request; fall back to simpler ones.
-        const attempts:MediaTrackConstraints[]=[{facingMode:'user',width:{ideal:640},height:{ideal:480},frameRate:{ideal:60,max:60}},{facingMode:'user',width:{ideal:640},height:{ideal:480}},{}];
+        // The zhetygen is played on a table, so phones use the rear camera for it.
+        const facingMode=instrument.id==='zhetygen'?'environment':'user';
+        const attempts:MediaTrackConstraints[]=[{facingMode,width:{ideal:640},height:{ideal:480},frameRate:{ideal:60,max:60}},{facingMode,width:{ideal:640},height:{ideal:480}},{}];
         let failure:unknown;
         for(const video of attempts){
           try{stream=await navigator.mediaDevices.getUserMedia({audio:false,video:Object.keys(video).length?video:true});failure=undefined;break;}
           catch(err){failure=err;const n=(err as Error).name;if(n==='NotAllowedError'||n==='NotFoundError'||cancelled)break;}
         }
         if(!stream)throw failure;
+        // A selfie view is mirrored so it reads like a mirror; a rear camera already sees the table as the player does.
+        mirrored=stream.getVideoTracks()[0]?.getSettings().facingMode!=='environment';setMirror(mirrored);
         if(cancelled){stream.getTracks().forEach(t=>t.stop());return;}
         if(video.current){video.current.srcObject=stream;await video.current.play();}
         const {FilesetResolver,HandLandmarker}=await import('@mediapipe/tasks-vision');const vision=await FilesetResolver.forVisionTasks('/wasm');if(cancelled)return;
@@ -253,7 +257,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
         {lite&&<div className="lite-note"><span>{t('lite.note')}</span><button className="text-button" onClick={()=>{autoLite.current=false;liteRef.current=false;lowRate.current=0;setLite(false);}}>{t('lite.restore')}</button></div>}
         <div ref={stage} className={`camera-stage motion-stage ${flash?'note-flash':''} ${miss?'note-miss':''}`} style={{aspectRatio:aspect}}>
           <div className="camera-viewport" style={{width:viewport.width||'100%',height:viewport.height||'100%'}}>
-            {mode==='live'&&<><video ref={video} muted playsInline autoPlay onLoadedMetadata={e=>{const v=e.currentTarget;setAspect(v.videoWidth/v.videoHeight||4/3);}}/><canvas ref={canvas}/></>}
+            {mode==='live'&&<><video ref={video} className={mirror?'':'unmirrored'} muted playsInline autoPlay onLoadedMetadata={e=>{const v=e.currentTarget;setAspect(v.videoWidth/v.videoHeight||4/3);}}/><canvas ref={canvas}/></>}
             {pops.map(p=><span key={p.id} className="score-pop" style={{left:`${p.x*100}%`,top:`${p.y*100}%`}}>+100</span>)}
             {!loading&&!error&&<ARInstrument instrument={instrument.id} visible={showAR} point={contact} trace={trace} active={recognized} target={phase==='playing'||phase==='ready'?guidance.target:undefined} ready={mode==='live'&&phase==='ready'} progress={readyProgress}/>}
           </div>

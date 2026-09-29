@@ -17,7 +17,7 @@ const dictionaries: Record<Lang, Record<string, string>> = { ru, en, kk };
 const storageKey = 'mura-lang';
 export const locales: Record<Lang, string> = { ru: 'ru-RU', en: 'en-GB', kk: 'kk-KZ' };
 /** Performances are stored under their Russian name; this maps it back to an instrument id. */
-export const instrumentIds: Record<string, string> = { 'Домбра': 'dombyra', 'Кобыз': 'kobyz', 'Дауылпаз': 'dauylpaz' };
+export const instrumentIds: Record<string, string> = { 'Домбра': 'dombyra', 'Кобыз': 'kobyz', 'Дауылпаз': 'dauylpaz', 'Жетыген': 'zhetygen' };
 
 function detect(): Lang {
   try {
@@ -77,7 +77,7 @@ export function localizeHint(lang: Lang, hint: CoachHint, ctx: HintContext): { t
     case 'ready-lost': return { title: t('c.ready-lost.t'), action: quality() };
     case 'strum-sideways': return { title: t('c.strum-sideways.t'), action: t(hint.action.includes('снизу') ? 'c.strum-sideways.up' : 'c.strum-sideways.down') };
   }
-  if (hasKey(lang, `c.${code}.t`)) return { title: t(`c.${code}.t`, { noun }), action: t(`c.${code}.a`, { noun }) };
+  if (hasKey(lang, `c.${code}.t`)) { const vars = { noun, name: g(ctx.nextId, 'name') }; return { title: t(`c.${code}.t`, vars), action: t(`c.${code}.a`, vars) }; }
   return { title: hint.title, action: hint.action };
 }
 const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);

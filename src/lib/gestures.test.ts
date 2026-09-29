@@ -169,7 +169,7 @@ test('a warning stays readable, and success replaces it immediately',()=>{
 test('zhetygen: lifting a finger and touching the table plays the string under that fingertip',()=>{
   const d=new MotionRecognizer('zhetygen');const taps=(x:number,finger:number,start:number)=>[tableHand(x,.6),tableHand(x,.6,finger),tableHand(x,.6,finger),tableHand(x,.6)].flatMap((h,i)=>d.update(h,start+i*50).events.map(e=>e.gesture));
   assert.deepEqual(taps(.545,0,0),['string-4']);
-  assert.deepEqual(taps(.545,3,200),['string-6']);
+  assert.deepEqual(taps(.545,3,200),['string-5']);
   const off=new MotionRecognizer('zhetygen');[tableHand(.17,.6),tableHand(.17,.6,0)].forEach((h,i)=>off.update(h,i*50));const r=off.update(tableHand(.17,.6),100);
   assert.deepEqual(r.events,[]);assert.equal(r.coach.code,'tap-off-strings');
 });
@@ -177,9 +177,8 @@ test('zhetygen: sliding or turning a resting hand plays nothing',()=>{
   const d=new MotionRecognizer('zhetygen');
   for(let i=0;i<24;i++){const h=tableHand(.25+i*.022,.6),a=i*.03,c=palmCenter(h);assert.deepEqual(d.update(h.map(p=>({x:c.x+(p.x-c.x)*Math.cos(a)-(p.y-c.y)*Math.sin(a),y:c.y+(p.x-c.x)*Math.sin(a)+(p.y-c.y)*Math.cos(a),z:0})),i*50).events,[]);}
 });
-test('zhetygen: a finger kept raised becomes its new resting pose instead of a stuck lift',()=>{
-  const d=new MotionRecognizer('zhetygen');d.update(tableHand(.545,.6),0);
-  for(let t=50;t<=1700;t+=50)d.update(tableHand(.545,.6,1),t);
-  assert.deepEqual(d.update(tableHand(.545,.6,1),1750).events,[]);
-  d.update(tableHand(.545,.6),1800);assert.deepEqual(d.update(tableHand(.545,.6,1),1850).events,[]);
+test('zhetygen: a changed resting pose is re-learned instead of blocking the finger',()=>{
+  const d=new MotionRecognizer('zhetygen');const play=(finger:number,from:number,to:number)=>{const out:Gesture[]=[];for(let t=from;t<=to;t+=50)out.push(...d.update(tableHand(.545,.6,finger),t).events.map(e=>e.gesture));return out;};
+  assert.deepEqual([...play(-1,0,0),...play(1,50,1750),...play(-1,1800,3400)],[]);
+  assert.deepEqual([...play(1,3450,3500),...play(-1,3550,3550)],['string-4']);
 });

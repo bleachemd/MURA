@@ -21,6 +21,13 @@ export function InstrumentArt({ type = 'dombyra', className = '' }: { type?: str
     <path d="M198 29L197 384M202 29L204 384" stroke="#f9eac6" strokeWidth="1.2"/>
     <path d="M190 386h22l-4 8h-14Z" fill="#684726"/>
     <path d="M169 329q-14 10 0 20q14-10 0-20m62 0q-14 10 0 20q14-10 0-20" fill="none" stroke="#825528" strokeWidth="1.8"/>
+  </g> : type === 'zhetygen' ? <g transform="rotate(-28 200 225)" filter={`url(#${id}shadow)`}>
+    <path d="M150 30Q200 14 250 30L264 404Q200 424 136 404Z" fill={`url(#${id}wood)`} stroke="#5f3b1f" strokeWidth="3"/>
+    <path d="M160 44Q200 32 240 44L252 392Q200 408 148 392Z" fill={`url(#${id}face)`} stroke="#6d4526" strokeWidth="2"/>
+    <path d="M160 44Q200 32 240 44L252 392Q200 408 148 392Z" fill={`url(#${id}grain)`}/>
+    <path d="M160 58h80M150 378h100" stroke="#5d3b25" strokeWidth="5"/>
+    {Array.from({length:7},(_,i)=><path key={i} d={`M${170+i*10} 58L${162+i*12.5} 378`} stroke="#f9eac6" strokeWidth="1.3"/>)}
+    {Array.from({length:7},(_,i)=>{const y=330-i*36;return <ellipse key={`a${i}`} cx={170+i*10+(y-58)/320*(i*2.5-8)} cy={y} rx="5.5" ry="4" fill="#efe0bd" stroke="#7a5230" strokeWidth="1.5"/>;})}
   </g> : type === 'kobyz' ? <g transform="rotate(15 200 220)" filter={`url(#${id}shadow)`}>
     <path d="M189 47Q174 16 197 14Q220 13 211 45L207 226L227 254Q271 294 252 369Q235 412 203 409Q157 412 144 366Q126 300 170 257L184 226Z" fill={`url(#${id}wood)`} stroke="#644027" strokeWidth="3"/>
     <path d="M185 75L183 246M205 69L207 246" stroke="#634025" strokeWidth="3"/>
