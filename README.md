@@ -62,7 +62,7 @@ MediaPipe даёт 21 точку кисти. Всё остальное напи�
 - **Мобильные** — адаптивная сцена, Wake Lock, облегчённый режим и автооткат GPU → CPU на слабых устройствах.
 - Рекорды и история — локально в браузере.
 
-**Стек:** React 19, TypeScript, Vite, MediaPipe Tasks Vision, Web Audio API. Деплой — Cloudflare Pages (`public/_headers`, `public/_redirects`).
+**Стек:** React 19, TypeScript, Vite, MediaPipe Tasks Vision, Web Audio API. Деплой — Cloudflare Workers Static Assets (`wrangler.jsonc`, `public/_headers`).
 
 ## Запуск и тесты
 

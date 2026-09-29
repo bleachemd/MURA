@@ -1,0 +1,10 @@
+{
+  "name": "mura",
+  "compatibility_date": "2026-09-29",
+  // Только статика, без кода воркера. SPA-фолбэк на index.html вместо _redirects:
+  // у Workers правило "/* /index.html 200" считается бесконечным циклом.
+  "assets": {
+    "directory": "./dist",
+    "not_found_handling": "single-page-application"
+  }
+}
