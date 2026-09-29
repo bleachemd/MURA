@@ -12,7 +12,7 @@
   --line-strong: rgb(242 233 214 / .26);
   --bone: #f2e9d6;
   --bone-dim: #a3aea9;
-  --bone-faint: #6f7f7f;
+  --bone-faint: #8797a0;
   --gold: #e6ac3c;
   --gold-ink: #241704;
   --kok: #4fcbc1;
@@ -371,7 +371,7 @@ h3.display { font-size: clamp(1.6rem, 2.6vw, 2.1rem); line-height: 1.08; }
 
 /* ── Language switch + lite mode ───────────────────────── */
 .lang-switch { display: flex; padding: 3px; gap: 2px; border-radius: 999px; border: 1px solid var(--line); }
-.lang-switch button { min-width: 44px; min-height: 38px; padding: 0 10px; border-radius: 999px; font-size: .82rem; font-weight: 600; color: var(--bone-dim); transition: color 160ms ease, background-color 160ms ease; }
+.lang-switch button { min-width: 44px; min-height: 44px; padding: 0 10px; border-radius: 999px; font-size: .82rem; font-weight: 600; color: var(--bone-dim); transition: color 160ms ease, background-color 160ms ease; }
 .lang-switch button[aria-pressed='true'] { background: var(--bone); color: var(--night); }
 .lite-note { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; padding: 8px 8px 8px 16px; border-radius: 14px; background: rgb(230 172 60 / .1); border: 1px solid rgb(230 172 60 / .35); font-size: .875rem; color: var(--bone-dim); }
 .lite-note .text-button { min-height: 36px; color: var(--gold); }

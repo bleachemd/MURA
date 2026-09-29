@@ -187,7 +187,7 @@ export function Session({ instrument, close, onComplete, sound, toggleSound }: {
         if(cancelled){model.close();return;}
         setLoading(false);reset();rateStart=performance.now();processed=0;schedule();
       }catch(e){
-        stream?.getTracks().forEach(t=>t.stop());if(cancelled)return;setLoading(false);const name=(e as Error).name;
+        stream?.getTracks().forEach(t=>t.stop());if(cancelled)return;setLoading(false);const name=(e as Error).name;console.warn('MURA: camera or model start failed',e);
         setError((e as Error).message==='secure'?'secure':name==='NotAllowedError'?'denied':name==='NotFoundError'?'notfound':name==='NotReadableError'?'busy':'other');
       }
     }

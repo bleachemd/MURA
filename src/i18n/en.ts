@@ -145,7 +145,7 @@ export const en: Record<string, string> = {
   'err.secure': 'The camera needs a secure HTTPS link or localhost. Open the site over HTTPS.',
   'err.denied': 'Camera access is blocked. Allow the camera in the site settings next to the address bar and try again.',
   'err.notfound': 'No camera found. Plug in a webcam or open the link on your phone.',
-  'err.busy': 'Another app is using the camera. Close it and try again.',
+  'err.busy': 'The camera is busy or turned off. Close other apps, check camera access in your system settings, then try again.',
   'err.other': 'Couldn’t start motion tracking. Check your connection and camera access, then try again.',
   'err.process': 'Couldn’t process the image. Restart the camera or open the demo.',
   's.ready.t': 'Line the dot on your hand up with the marker',
